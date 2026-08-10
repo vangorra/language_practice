@@ -25,13 +25,35 @@ function cardClass(card, flash) {
   return classes.join(' ');
 }
 
+const LONG_TEXT_THRESHOLD = 24; // chars; longer phrases get a smaller font
+
 function renderColumn(container, cards, side, flash, onPick) {
   container.innerHTML = '';
   for (const card of cards) {
+    const text = side === 'en' ? card.word.en : card.word.es;
+
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = cardClass(card, flash);
-    btn.textContent = side === 'en' ? card.word.en : card.word.es;
+    if (text.length > LONG_TEXT_THRESHOLD) btn.classList.add('long-text');
+
+    const main = document.createElement('span');
+    main.className = 'card-main';
+    main.textContent = text;
+    btn.appendChild(main);
+
+    // Context is a short subheading shown only on the English side —
+    // it disambiguates words with multiple senses (e.g. "to be" -> ser
+    // vs. estar) and labels which verb/person a conjugated form belongs
+    // to. The Spanish side never gets this: for conjugations, the actual
+    // conjugated word *is* the content on that side.
+    if (side === 'en' && card.word.context) {
+      const sub = document.createElement('span');
+      sub.className = 'card-context';
+      sub.textContent = card.word.context;
+      btn.appendChild(sub);
+    }
+
     btn.addEventListener('click', () => onPick(side, card.wordId));
     container.appendChild(btn);
   }

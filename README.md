@@ -7,6 +7,14 @@ replaced with new words drawn from a spaced-repetition scheduler that
 prioritizes words you're struggling with, trickles in new ones, and
 occasionally rechecks words you already know well.
 
+The deck isn't limited to single words — it also includes short common
+phrases ("where is the bathroom?" → "¿dónde está el baño?") and present-tense
+verb conjugations, where the Spanish card shows the actual conjugated form
+(e.g. "hablas") rather than just the infinitive. English cards that could be
+confused with another sense of the same word — "to be" (ser vs. estar), or a
+conjugation's verb/person — show a small subheading under the main text for
+context.
+
 ## Running it
 
 No build step, no dependencies. Either:
@@ -73,9 +81,18 @@ node --test tests/
 
 ## Extending
 
-- **Add words**: append entries to the `WORDS` array in `js/words.js`.
-  Keep every `en` value unique and every `es` value unique across the
-  whole list, so a pool never contains an ambiguous pair.
+- **Add words, phrases, or conjugations**: append entries to `RAW_WORDS`
+  in `js/words.js`. Each entry needs `en`, `es`, and `category`; `context`
+  is an optional subheading shown under the English card only (use it to
+  disambiguate a word with more than one sense, or to tag a conjugation's
+  verb/person), and `type` (`'word' | 'phrase' | 'conjugation'`) is purely
+  informational. Keep every `es` value unique across the whole list — a
+  word's id is derived from it. `en` values *can* repeat as long as the
+  entries have different `context`, since that's what lets a player tell
+  them apart if both land in the pool at once (e.g. "to be" / ser vs.
+  "to be" / estar). The `conjugationSet(...)` helper builds a full set of
+  present-tense person entries for one verb in a few lines — see the
+  "Verb conjugations" section for examples.
 - **Tune the scheduler**: `js/srs.js` exposes the learning-step lengths,
   ease-factor bounds, mastery threshold, and the pool-selection weights
   (new-word cap, new-word chance, mastery-check chance) as named
