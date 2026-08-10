@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spanish Vocab Matcher</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>Spanish Vocab Matcher</h1>
+    <p class="subtitle">Match each English word to its Spanish translation.</p>
+  </header>
+
+  <section id="stats" class="stats-bar" aria-label="Progress summary"></section>
+
+  <main class="board">
+    <div class="column" aria-label="English words">
+      <h2 class="column-title">English</h2>
+      <div id="en-column" class="card-list"></div>
+    </div>
+    <div class="column" aria-label="Spanish words">
+      <h2 class="column-title">Español</h2>
+      <div id="es-column" class="card-list"></div>
+    </div>
+  </main>
+
+  <footer class="controls">
+    <label for="pool-size">
+      Cards on screen:
+      <select id="pool-size">
+        <option value="4">4</option>
+        <option value="6" selected>6</option>
+        <option value="8">8</option>
+        <option value="10">10</option>
+      </select>
+    </label>
+    <button id="reset-btn" type="button">Reset progress</button>
+  </footer>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
