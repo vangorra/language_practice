@@ -1,0 +1,5 @@
+# Source data for scripts/import_vocab.py -- large third-party downloads,
+# regenerated on demand (see that script's docstring for the fetch commands).
+scripts/data/
+__pycache__/
+node_modules/

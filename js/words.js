@@ -1,3 +1,5 @@
+import { RAW_IMPORTED_WORDS } from './words-imported.js';
+
 // Vocabulary list: single words, short common phrases, and verb
 // conjugations, all matched the same way (one English card <-> one
 // Spanish card).
@@ -532,6 +534,313 @@ const RAW_WORDS = [
     },
     'preterite (past)'
   ),
+
+  // Present tense — a broader set of common verbs, sourced from a
+  // frequency-ranked corpus list and generated/verified with an MIT-licensed
+  // Spanish conjugation engine (@jirimracek/conjugate-esp) rather than
+  // hand-typed, so the Spanish side is guaranteed correct.
+  ...conjugationSet('creer (to believe)', {
+    yo: ['I believe', 'creo'],
+    tú: ['you believe', 'crees'],
+    'él/ella': ['he/she believes', 'cree'],
+    nosotros: ['we believe', 'creemos'],
+    ellos: ['they believe', 'creen'],
+  }),
+  ...conjugationSet('deber (should/must)', {
+    // Modal verb in English -- "should"/"must" doesn't change by person.
+    yo: ['I should', 'debo'],
+    tú: ['you should', 'debes'],
+    'él/ella': ['he/she should', 'debe'],
+    nosotros: ['we should', 'debemos'],
+    ellos: ['they should', 'deben'],
+  }),
+  ...conjugationSet('dejar (to let/leave behind)', {
+    yo: ['I let', 'dejo'],
+    tú: ['you let', 'dejas'],
+    'él/ella': ['he/she lets', 'deja'],
+    nosotros: ['we let', 'dejamos'],
+    ellos: ['they let', 'dejan'],
+  }),
+  ...conjugationSet('pasar (to pass/happen)', {
+    yo: ['I pass', 'paso'],
+    tú: ['you pass', 'pasas'],
+    'él/ella': ['he/she passes', 'pasa'],
+    nosotros: ['we pass', 'pasamos'],
+    ellos: ['they pass', 'pasan'],
+  }),
+  ...conjugationSet('sentir (to feel)', {
+    yo: ['I feel', 'siento'],
+    tú: ['you feel', 'sientes'],
+    'él/ella': ['he/she feels', 'siente'],
+    nosotros: ['we feel', 'sentimos'],
+    ellos: ['they feel', 'sienten'],
+  }),
+  ...conjugationSet('esperar (to wait/hope)', {
+    yo: ['I wait', 'espero'],
+    tú: ['you wait', 'esperas'],
+    'él/ella': ['he/she waits', 'espera'],
+    nosotros: ['we wait', 'esperamos'],
+    ellos: ['they wait', 'esperan'],
+  }),
+  ...conjugationSet('encontrar (to find)', {
+    yo: ['I find', 'encuentro'],
+    tú: ['you find', 'encuentras'],
+    'él/ella': ['he/she finds', 'encuentra'],
+    nosotros: ['we find', 'encontramos'],
+    ellos: ['they find', 'encuentran'],
+  }),
+  ...conjugationSet('volver (to return)', {
+    yo: ['I return', 'vuelvo'],
+    tú: ['you return', 'vuelves'],
+    'él/ella': ['he/she returns', 'vuelve'],
+    nosotros: ['we return', 'volvemos'],
+    ellos: ['they return', 'vuelven'],
+  }),
+  ...conjugationSet('llamar (to call)', {
+    yo: ['I call', 'llamo'],
+    tú: ['you call', 'llamas'],
+    'él/ella': ['he/she calls', 'llama'],
+    nosotros: ['we call', 'llamamos'],
+    ellos: ['they call', 'llaman'],
+  }),
+  ...conjugationSet('parecer (to seem)', {
+    yo: ['I seem', 'parezco'],
+    tú: ['you seem', 'pareces'],
+    'él/ella': ['he/she seems', 'parece'],
+    nosotros: ['we seem', 'parecemos'],
+    ellos: ['they seem', 'parecen'],
+  }),
+  ...conjugationSet('tomar (to take/drink)', {
+    yo: ['I take', 'tomo'],
+    tú: ['you take', 'tomas'],
+    'él/ella': ['he/she takes', 'toma'],
+    nosotros: ['we take', 'tomamos'],
+    ellos: ['they take', 'toman'],
+  }),
+  ...conjugationSet('llegar (to arrive)', {
+    yo: ['I arrive', 'llego'],
+    tú: ['you arrive', 'llegas'],
+    'él/ella': ['he/she arrives', 'llega'],
+    nosotros: ['we arrive', 'llegamos'],
+    ellos: ['they arrive', 'llegan'],
+  }),
+  ...conjugationSet('seguir (to follow/continue)', {
+    yo: ['I follow', 'sigo'],
+    tú: ['you follow', 'sigues'],
+    'él/ella': ['he/she follows', 'sigue'],
+    nosotros: ['we follow', 'seguimos'],
+    ellos: ['they follow', 'siguen'],
+  }),
+  ...conjugationSet('conocer (to know a person/place)', {
+    yo: ['I know', 'conozco'],
+    tú: ['you know', 'conoces'],
+    'él/ella': ['he/she knows', 'conoce'],
+    nosotros: ['we know', 'conocemos'],
+    ellos: ['they know', 'conocen'],
+  }),
+  ...conjugationSet('buscar (to look for)', {
+    yo: ['I look for', 'busco'],
+    tú: ['you look for', 'buscas'],
+    'él/ella': ['he/she looks for', 'busca'],
+    nosotros: ['we look for', 'buscamos'],
+    ellos: ['they look for', 'buscan'],
+  }),
+  ...conjugationSet('perder (to lose)', {
+    yo: ['I lose', 'pierdo'],
+    tú: ['you lose', 'pierdes'],
+    'él/ella': ['he/she loses', 'pierde'],
+    nosotros: ['we lose', 'perdemos'],
+    ellos: ['they lose', 'pierden'],
+  }),
+  ...conjugationSet('entender (to understand)', {
+    yo: ['I understand', 'entiendo'],
+    tú: ['you understand', 'entiendes'],
+    'él/ella': ['he/she understands', 'entiende'],
+    nosotros: ['we understand', 'entendemos'],
+    ellos: ['they understand', 'entienden'],
+  }),
+  ...conjugationSet('trabajar (to work)', {
+    yo: ['I work', 'trabajo'],
+    tú: ['you work', 'trabajas'],
+    'él/ella': ['he/she works', 'trabaja'],
+    nosotros: ['we work', 'trabajamos'],
+    ellos: ['they work', 'trabajan'],
+  }),
+  ...conjugationSet('empezar (to begin)', {
+    yo: ['I begin', 'empiezo'],
+    tú: ['you begin', 'empiezas'],
+    'él/ella': ['he/she begins', 'empieza'],
+    nosotros: ['we begin', 'empezamos'],
+    ellos: ['they begin', 'empiezan'],
+  }),
+  ...conjugationSet('traer (to bring)', {
+    yo: ['I bring', 'traigo'],
+    tú: ['you bring', 'traes'],
+    'él/ella': ['he/she brings', 'trae'],
+    nosotros: ['we bring', 'traemos'],
+    ellos: ['they bring', 'traen'],
+  }),
+  ...conjugationSet('cambiar (to change)', {
+    yo: ['I change', 'cambio'],
+    tú: ['you change', 'cambias'],
+    'él/ella': ['he/she changes', 'cambia'],
+    nosotros: ['we change', 'cambiamos'],
+    ellos: ['they change', 'cambian'],
+  }),
+  ...conjugationSet('jugar (to play)', {
+    yo: ['I play', 'juego'],
+    tú: ['you play', 'juegas'],
+    'él/ella': ['he/she plays', 'juega'],
+    nosotros: ['we play', 'jugamos'],
+    ellos: ['they play', 'juegan'],
+  }),
+  ...conjugationSet('leer (to read)', {
+    yo: ['I read', 'leo'],
+    tú: ['you read', 'lees'],
+    'él/ella': ['he/she reads', 'lee'],
+    nosotros: ['we read', 'leemos'],
+    ellos: ['they read', 'leen'],
+  }),
+  ...conjugationSet('dormir (to sleep)', {
+    yo: ['I sleep', 'duermo'],
+    tú: ['you sleep', 'duermes'],
+    'él/ella': ['he/she sleeps', 'duerme'],
+    nosotros: ['we sleep', 'dormimos'],
+    ellos: ['they sleep', 'duermen'],
+  }),
+  ...conjugationSet('llevar (to carry/wear)', {
+    yo: ['I carry', 'llevo'],
+    tú: ['you carry', 'llevas'],
+    'él/ella': ['he/she carries', 'lleva'],
+    nosotros: ['we carry', 'llevamos'],
+    ellos: ['they carry', 'llevan'],
+  }),
+
+  // More preterite (simple past) coverage, same source/verification as above.
+  ...conjugationSet('creer (to believe)', {
+    yo: ['I believed', 'creí'],
+    tú: ['you believed', 'creíste'],
+    'él/ella': ['he/she believed', 'creyó'],
+    nosotros: ['we believed', 'creímos'],
+    ellos: ['they believed', 'creyeron'],
+  }, 'preterite (past)'),
+  ...conjugationSet('sentir (to feel)', {
+    // "nosotros" ("sentimos") skipped: identical to the present-tense form
+    // for this -ir verb, so it can't be a second, distinct card.
+    yo: ['I felt', 'sentí'],
+    tú: ['you felt', 'sentiste'],
+    'él/ella': ['he/she felt', 'sintió'],
+    ellos: ['they felt', 'sintieron'],
+  }, 'preterite (past)'),
+  ...conjugationSet('encontrar (to find)', {
+    // "nosotros" ("encontramos") skipped: identical to the present-tense form.
+    yo: ['I found', 'encontré'],
+    tú: ['you found', 'encontraste'],
+    'él/ella': ['he/she found', 'encontró'],
+    ellos: ['they found', 'encontraron'],
+  }, 'preterite (past)'),
+  ...conjugationSet('volver (to return)', {
+    yo: ['I returned', 'volví'],
+    tú: ['you returned', 'volviste'],
+    'él/ella': ['he/she returned', 'volvió'],
+    nosotros: ['we returned', 'volvimos'],
+    ellos: ['they returned', 'volvieron'],
+  }, 'preterite (past)'),
+  ...conjugationSet('llamar (to call)', {
+    // "nosotros" ("llamamos") skipped: identical to the present-tense form.
+    yo: ['I called', 'llamé'],
+    tú: ['you called', 'llamaste'],
+    'él/ella': ['he/she called', 'llamó'],
+    ellos: ['they called', 'llamaron'],
+  }, 'preterite (past)'),
+  ...conjugationSet('tomar (to take/drink)', {
+    // "nosotros" ("tomamos") skipped: identical to the present-tense form.
+    yo: ['I took', 'tomé'],
+    tú: ['you took', 'tomaste'],
+    'él/ella': ['he/she took', 'tomó'],
+    ellos: ['they took', 'tomaron'],
+  }, 'preterite (past)'),
+  ...conjugationSet('llegar (to arrive)', {
+    // "nosotros" ("llegamos") skipped: identical to the present-tense form.
+    yo: ['I arrived', 'llegué'],
+    tú: ['you arrived', 'llegaste'],
+    'él/ella': ['he/she arrived', 'llegó'],
+    ellos: ['they arrived', 'llegaron'],
+  }, 'preterite (past)'),
+  ...conjugationSet('seguir (to follow/continue)', {
+    // "nosotros" ("seguimos") skipped: identical to the present-tense form.
+    yo: ['I followed', 'seguí'],
+    tú: ['you followed', 'seguiste'],
+    'él/ella': ['he/she followed', 'siguió'],
+    ellos: ['they followed', 'siguieron'],
+  }, 'preterite (past)'),
+  ...conjugationSet('empezar (to begin)', {
+    // "nosotros" ("empezamos") skipped: identical to the present-tense form.
+    yo: ['I began', 'empecé'],
+    tú: ['you began', 'empezaste'],
+    'él/ella': ['he/she began', 'empezó'],
+    ellos: ['they began', 'empezaron'],
+  }, 'preterite (past)'),
+  ...conjugationSet('traer (to bring)', {
+    yo: ['I brought', 'traje'],
+    tú: ['you brought', 'trajiste'],
+    'él/ella': ['he/she brought', 'trajo'],
+    nosotros: ['we brought', 'trajimos'],
+    ellos: ['they brought', 'trajeron'],
+  }, 'preterite (past)'),
+
+  // Imperfect (past) — used for ongoing/habitual past actions ("used to...").
+  // Spanish imperfect has an identical "yo" and "él/ella" form for every
+  // verb, so those two persons share a single merged card below instead of
+  // two cards that would collide on the exact same Spanish text.
+  ...conjugationSet('creer (to believe)', {
+    'yo / él/ella': ['I/he/she used to believe', 'creía'],
+    tú: ['you used to believe', 'creías'],
+    nosotros: ['we used to believe', 'creíamos'],
+    ellos: ['they used to believe', 'creían'],
+  }, 'imperfect (past)'),
+  ...conjugationSet('sentir (to feel)', {
+    'yo / él/ella': ['I/he/she used to feel', 'sentía'],
+    tú: ['you used to feel', 'sentías'],
+    nosotros: ['we used to feel', 'sentíamos'],
+    ellos: ['they used to feel', 'sentían'],
+  }, 'imperfect (past)'),
+  ...conjugationSet('esperar (to wait/hope)', {
+    'yo / él/ella': ['I/he/she used to wait', 'esperaba'],
+    tú: ['you used to wait', 'esperabas'],
+    nosotros: ['we used to wait', 'esperábamos'],
+    ellos: ['they used to wait', 'esperaban'],
+  }, 'imperfect (past)'),
+  ...conjugationSet('volver (to return)', {
+    'yo / él/ella': ['I/he/she used to return', 'volvía'],
+    tú: ['you used to return', 'volvías'],
+    nosotros: ['we used to return', 'volvíamos'],
+    ellos: ['they used to return', 'volvían'],
+  }, 'imperfect (past)'),
+  ...conjugationSet('llamar (to call)', {
+    'yo / él/ella': ['I/he/she used to call', 'llamaba'],
+    tú: ['you used to call', 'llamabas'],
+    nosotros: ['we used to call', 'llamábamos'],
+    ellos: ['they used to call', 'llamaban'],
+  }, 'imperfect (past)'),
+  ...conjugationSet('seguir (to follow/continue)', {
+    'yo / él/ella': ['I/he/she used to follow', 'seguía'],
+    tú: ['you used to follow', 'seguías'],
+    nosotros: ['we used to follow', 'seguíamos'],
+    ellos: ['they used to follow', 'seguían'],
+  }, 'imperfect (past)'),
+  ...conjugationSet('trabajar (to work)', {
+    'yo / él/ella': ['I/he/she used to work', 'trabajaba'],
+    tú: ['you used to work', 'trabajabas'],
+    nosotros: ['we used to work', 'trabajábamos'],
+    ellos: ['they used to work', 'trabajaban'],
+  }, 'imperfect (past)'),
+  ...conjugationSet('jugar (to play)', {
+    'yo / él/ella': ['I/he/she used to play', 'jugaba'],
+    tú: ['you used to play', 'jugabas'],
+    nosotros: ['we used to play', 'jugábamos'],
+    ellos: ['they used to play', 'jugaban'],
+  }, 'imperfect (past)'),
 
   // Adjectives
   { en: 'big', es: 'grande', category: 'adjectives' },
@@ -2399,7 +2708,11 @@ const RAW_WORDS = [
   { en: 'myth', es: 'el mito', category: 'concepts' },
 ];
 
-export const WORDS = RAW_WORDS.map((w) => ({ type: 'word', ...w, id: slugify(w.es) }));
+export const WORDS = [...RAW_WORDS, ...RAW_IMPORTED_WORDS].map((w) => ({
+  type: 'word',
+  ...w,
+  id: slugify(w.es),
+}));
 
 // Fail fast in development if two entries collide on their derived id
 // (i.e. share the same `es` text) — that would make them unpairable.

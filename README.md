@@ -7,15 +7,23 @@ replaced with new words drawn from a spaced-repetition scheduler that
 prioritizes words you're struggling with, trickles in new ones, and
 occasionally rechecks words you already know well.
 
-The deck (2,000+ entries) isn't limited to single words — it also
+The deck (3,100+ entries) isn't limited to single words — it also
 includes hundreds of short common phrases ("where is the bathroom?" →
-"¿dónde está el baño?") and verb conjugations (present tense for ~18
-verbs, plus preterite/past tense for a handful of the most common ones),
-where the Spanish card shows the actual conjugated form (e.g. "hablas")
-rather than just the infinitive. English cards that could be confused
-with another sense of the same word — "to be" (ser vs. estar), "derecha"
-(direction vs. political right-wing), a conjugation's verb/person — show
-a small subheading under the main text for context.
+"¿dónde está el baño?") and verb conjugations (present tense for ~43
+verbs, preterite for ~15, imperfect for 8), where the Spanish card shows
+the actual conjugated form (e.g. "hablas") rather than just the
+infinitive. English cards that could be confused with another sense of
+the same word — "to be" (ser vs. estar), "derecha" (direction vs.
+political right-wing), a conjugation's verb/person — show a small
+subheading under the main text for context.
+
+About 900 of the non-verb entries were imported from a real
+frequency-ranked Spanish corpus + Wiktionary rather than hand-typed (see
+"Credits" below) — hand-authoring thousands of word pairs by hand risks
+typos and isn't how you'd want a reference vocabulary built anyway. The
+verb conjugations are generated and cross-checked against an independent
+open-source conjugation engine rather than typed from memory, for the
+same reason.
 
 Three tabs:
 
@@ -99,7 +107,8 @@ persistence.
 ```
 index.html          Page shell / layout (Practice / Word List / Stats tabs)
 styles.css           All styling
-js/words.js          2,000+ word/phrase/conjugation entries
+js/words.js          Hand-curated word/phrase/conjugation entries (merges in words-imported.js)
+js/words-imported.js Auto-generated frequency-sourced vocabulary (see scripts/import_vocab.py)
 js/srs.js            Pure scheduling logic (SM-2 variant, "mark known", pool selection)
 js/history.js        Pure streak/chart-data helpers over the daily review log
 js/db.js             IndexedDB persistence (per-word states + daily history)
@@ -107,6 +116,8 @@ js/game.js           Game state machine (pool, selection, match handling, histor
 js/main.js           DOM wiring / rendering (tabs, table, chart, long-press menu)
 tests/srs.test.mjs   Unit tests for the scheduler
 tests/history.test.mjs  Unit tests for streak/chart-data helpers
+scripts/import_vocab.py         ETL: frequency data + Wiktionary glosses -> words-imported.js
+scripts/validate_conjugations.mjs  Checks every conjugation card against an independent engine
 ```
 
 ## Tests
@@ -121,6 +132,47 @@ node --test tests/srs.test.mjs tests/history.test.mjs
 (Running `node --test tests/` as a bare directory can hit an unrelated
 module-resolution quirk in some Node versions — pointing at the files
 directly, as above, always works.)
+
+Every conjugation card's Spanish form is also cross-checked against an
+independent conjugation engine (see "Credits"):
+
+```sh
+npm install @jirimracek/conjugate-esp   # one-off, not a runtime dependency
+node scripts/validate_conjugations.mjs
+```
+
+## Credits
+
+The hand-curated vocabulary and this app's code are original to this
+project. Two pieces of content were generated from open third-party
+sources rather than typed by hand, specifically because hand-typing them
+carries real risk of typos/errors at this scale:
+
+- **~900 vocabulary entries** in `js/words-imported.js` come from
+  [doozan/spanish_data](https://github.com/doozan/spanish_data)
+  (CC-BY-SA), a frequency-ranked Spanish word list combined with English
+  glosses. That project itself combines:
+  - [Wiktionary](https://en.wiktionary.org) (CC-BY-SA) — the English
+    glosses for each Spanish word
+  - [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords)
+    (MIT) — the underlying word-frequency ranking, derived from
+    OpenSubtitles
+
+  See `scripts/import_vocab.py` for exactly how words were selected and
+  cleaned (frequency rank, deduped against the hand-curated deck, with
+  archaic/regional/vulgar senses filtered out).
+
+- **Conjugated verb forms** (313 cards across present, preterite, and
+  imperfect tense) are generated and/or cross-checked with
+  [@jirimracek/conjugate-esp](https://github.com/jirimracek/conjugate-esp)
+  (MIT), an independent Spanish conjugation engine — see
+  `scripts/validate_conjugations.mjs`.
+
+Neither of these is a runtime dependency of the app itself — they were
+used offline to generate/verify static data now committed as plain JS,
+so the app you actually run stays dependency-free. Per CC-BY-SA, any
+redistribution of `js/words-imported.js` (or a derivative of it) should
+carry forward this same attribution.
 
 ## Extending
 
@@ -140,7 +192,16 @@ directly, as above, always works.)
   / ser vs. "to be" / estar). The `conjugationSet(contextLabel, forms,
   tense?)` helper builds a full set of per-person entries for one verb in
   a few lines — see the "Verb conjugations" and "Preterite" sections for
-  examples of present and past tense.
+  examples of present and past tense. When adding a new verb's
+  conjugations, get the Spanish forms from `conjugate-esp` (see
+  "Credits") rather than typing them from memory, and add the verb to
+  `KNOWN_VERBS` in `scripts/validate_conjugations.mjs` so it stays
+  covered by the validation script.
+- **Import more frequency-ranked vocabulary**: re-run
+  `scripts/import_vocab.py --target N` (see its docstring for the fetch
+  commands) to pull more words than are currently in
+  `js/words-imported.js` — it automatically skips anything already in
+  the deck, hand-curated or previously imported.
 - **Tune the scheduler**: `js/srs.js` exposes the learning-step lengths,
   ease-factor bounds, mastery threshold, manual-known interval, and the
   pool-selection weights (new-word cap, new-word chance, mastery-check
