@@ -2,8 +2,8 @@ import { WORDS } from './words.js';
 import { createWordState, reviewWord, tierOf, pickNextWord, markKnown, markNeedsPractice, TIER } from './srs.js';
 import { getAllWordStates, putWordState, clearWordStates, getHistoryAll, putHistoryDay, clearHistory } from './db.js';
 import { dateKey, addReviewToRecord, computeStreak, computeLongestStreak, lastNDaysSeries, totals } from './history.js';
+import { createConjugationExpander } from './dynamic-conjugator.js';
 
-const WORDS_BY_ID = new Map(WORDS.map((w) => [w.id, w]));
 const MISMATCH_FLASH_MS = 500;
 const MATCH_FLASH_MS = 350;
 const HISTORY_CHART_DAYS = 30;
@@ -13,6 +13,10 @@ function bucketFromMisses(misses) {
   if (misses <= 0) return 'clean';
   if (misses === 1) return 'retried';
   return 'lapsed';
+}
+
+function isVerbInfinitive(w) {
+  return w.category === 'verbs' && w.type === 'word';
 }
 
 /**
@@ -25,6 +29,21 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
   const states = hydrateStates(savedStates);
   const historyByDate = { ...savedHistory };
 
+  // `allWords` starts as the static catalog and grows as verb conjugations
+  // get generated (see expandVerbIfNeeded). Conjugating one verb takes a
+  // few milliseconds; conjugating every verb in the deck up front would
+  // take several *seconds* and freeze the UI on load (worse on a phone),
+  // so this happens lazily, spread across normal play, instead. See
+  // js/dynamic-conjugator.js for why this doesn't jeopardize per-word
+  // stats/persistence: ids are still derived from Spanish text, so a
+  // conjugation generated this session lands on the exact same id a
+  // previous (or future) session would generate for it.
+  let allWords = [...WORDS];
+  let wordsById = new Map(allWords.map((w) => [w.id, w]));
+  const usedIds = new Set(allWords.map((w) => w.id));
+  const expandedVerbEs = new Set();
+  const { expandVerb } = createConjugationExpander(usedIds);
+
   /** @type {{wordId:string, misses:number}[]} */
   let enColumn = [];
   /** @type {{wordId:string, misses:number}[]} */
@@ -33,16 +52,40 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
   let selectedEsId = null;
   let lockInput = false; // brief lock during flash animations
 
+  function expandVerbIfNeeded(word) {
+    if (!isVerbInfinitive(word) || expandedVerbEs.has(word.es)) return;
+    expandedVerbEs.add(word.es);
+    const newEntries = expandVerb(word);
+    for (const entry of newEntries) {
+      allWords.push(entry);
+      wordsById.set(entry.id, entry);
+      states[entry.id] = savedStates[entry.id]
+        ? { ...createWordState(), ...savedStates[entry.id] }
+        : createWordState();
+    }
+  }
+
+  // Catch-up pass: a verb encountered in an earlier session should have
+  // its conjugations available immediately (both so returning progress on
+  // them reattaches right away, and so the scheduler can pick them without
+  // waiting for that verb to be re-introduced into the pool).
+  for (const word of WORDS) {
+    if (isVerbInfinitive(word) && states[word.id]?.timesSeen > 0) {
+      expandVerbIfNeeded(word);
+    }
+  }
+
   function activeIds() {
     return new Set(enColumn.map((c) => c.wordId));
   }
 
   function fillPool() {
     while (enColumn.length < poolSize) {
-      const word = pickNextWord(WORDS, states, activeIds());
+      const word = pickNextWord(allWords, states, activeIds());
       if (!word) break;
       insertRandom(enColumn, { wordId: word.id, misses: 0 });
       insertRandom(esColumn, { wordId: word.id, misses: 0 });
+      expandVerbIfNeeded(word);
     }
   }
 
@@ -65,7 +108,7 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
 
   function tierCounts() {
     const counts = { [TIER.NEW]: 0, [TIER.LEARNING]: 0, [TIER.FAMILIAR]: 0, [TIER.MASTERED]: 0 };
-    for (const w of WORDS) counts[tierOf(states[w.id])]++;
+    for (const w of allWords) counts[tierOf(states[w.id])]++;
     return counts;
   }
 
@@ -77,11 +120,11 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
   function snapshot() {
     const flash = currentFlash();
     return {
-      en: enColumn.map((c) => ({ ...c, word: WORDS_BY_ID.get(c.wordId), selected: c.wordId === selectedEnId })),
-      es: esColumn.map((c) => ({ ...c, word: WORDS_BY_ID.get(c.wordId), selected: c.wordId === selectedEsId })),
+      en: enColumn.map((c) => ({ ...c, word: wordsById.get(c.wordId), selected: c.wordId === selectedEnId })),
+      es: esColumn.map((c) => ({ ...c, word: wordsById.get(c.wordId), selected: c.wordId === selectedEsId })),
       locked: lockInput,
       flash,
-      stats: { total: WORDS.length, counts: tierCounts() },
+      stats: { total: allWords.length, counts: tierCounts() },
     };
   }
 
@@ -195,7 +238,7 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
 
   /** Every word plus its current stats, for the Word List table. Cheap enough to call on demand even at a few thousand words. */
   function getAllWordsWithStats() {
-    return WORDS.map((w) => {
+    return allWords.map((w) => {
       const s = states[w.id];
       return {
         ...w,
@@ -221,7 +264,7 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
   }
 
   function getWordById(wordId) {
-    return WORDS_BY_ID.get(wordId) ?? null;
+    return wordsById.get(wordId) ?? null;
   }
 
   /** Streak/accuracy/chart data for the Stats view. */
@@ -239,6 +282,15 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     for (const id of Object.keys(states)) delete states[id];
     Object.assign(states, hydrateStates({}));
     for (const key of Object.keys(historyByDate)) delete historyByDate[key];
+
+    // Drop every dynamically-generated conjugation and go back to just the
+    // static catalog, so a full reset really does start from scratch.
+    allWords = [...WORDS];
+    wordsById = new Map(allWords.map((w) => [w.id, w]));
+    usedIds.clear();
+    for (const w of allWords) usedIds.add(w.id);
+    expandedVerbEs.clear();
+
     enColumn = [];
     esColumn = [];
     selectedEnId = null;

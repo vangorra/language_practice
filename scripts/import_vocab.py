@@ -112,7 +112,7 @@ def strip_article(text):
 def useful_qualifier(q):
     if not q:
         return None
-    words = {w.strip().lower() for w in re.split(r"[,;]", q) if w.strip()}
+    words = {w.strip().lower() for w in re.split(r"[,;]|\bor\b", q) if w.strip()}
     if words <= UNHELPFUL_QUALIFIER_WORDS:
         return None
     # Some qualifiers are a long list of regions/registers (e.g. "also
@@ -125,32 +125,47 @@ def useful_qualifier(q):
     return q
 
 
+def _try_gloss(gloss):
+    """Return (primary, context) for one gloss entry, or None if unusable."""
+    text = gloss["text"]
+    if text.startswith("("):
+        # Leading parenthetical is usually a taxonomic/technical tag
+        # ("(Thuja) thuja") rather than something worth cleaning up.
+        return None
+    if BAD_GLOSS_PATTERNS.search(text):
+        return None
+    if gloss["q"] and BAD_QUALIFIER_PATTERNS.search(gloss["q"]):
+        return None
+    # Drop a trailing usage-note bracket, e.g. "to hope [+direct object...]"
+    text = re.sub(r"\s*\[.*$", "", text).strip()
+    # Strip a parenthetical explanation suffix like "dog (# The species ...)"
+    text = re.sub(r"\s*\(#.*?\)\s*$", "", text)
+    text = re.sub(r"\s*\([^()]*\)\s*$", "", text).strip()
+    if not text:
+        return None
+    # Take just the first comma/semicolon-separated alternative as the
+    # primary English gloss; keep it short for a flashcard front.
+    primary = re.split(r"[;,]", text)[0].strip()
+    primary = re.sub(r"^(a|an|the)\s+", "", primary, flags=re.IGNORECASE)
+    if not primary or len(primary) > 30:
+        return None
+    context = useful_qualifier(gloss["q"].strip()) if gloss["q"] else None
+    return primary, context
+
+
 def clean_gloss(pos_block):
-    """Return (en, context) for the first usable gloss in a pos block, or None."""
-    for gloss in pos_block["glosses"]:
-        text = gloss["text"]
-        if text.startswith("("):
-            # Leading parenthetical is usually a taxonomic/technical tag
-            # ("(Thuja) thuja") rather than something worth cleaning up.
-            continue
-        if BAD_GLOSS_PATTERNS.search(text):
-            continue
-        if gloss["q"] and BAD_QUALIFIER_PATTERNS.search(gloss["q"]):
-            continue
-        # Strip a parenthetical explanation suffix like "dog (# The species ...)"
-        text = re.sub(r"\s*\(#.*?\)\s*$", "", text)
-        text = re.sub(r"\s*\([^()]*\)\s*$", "", text).strip()
-        if not text:
-            continue
-        # Take just the first comma/semicolon-separated alternative as the
-        # primary English gloss; keep it short for a flashcard front.
-        primary = re.split(r"[;,]", text)[0].strip()
-        primary = re.sub(r"^(a|an|the)\s+", "", primary, flags=re.IGNORECASE)
-        if not primary or len(primary) > 30:
-            continue
-        context = useful_qualifier(gloss["q"].strip()) if gloss["q"] else None
-        return primary, context
-    return None
+    """Return (en, context) for the best usable gloss in a pos block, or None."""
+    candidates = [_try_gloss(g) for g in pos_block["glosses"]]
+    candidates = [c for c in candidates if c is not None]
+    if not candidates:
+        return None
+    if pos_block["pos"] == "v":
+        # Verb glosses conventionally read as "to VERB" -- prefer one of
+        # those over an oddly-phrased alternate sense if both are present.
+        infinitive = next((c for c in candidates if c[0].lower().startswith("to ")), None)
+        if infinitive:
+            return infinitive
+    return candidates[0]
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +178,8 @@ def parse_frequency(path):
         return list(csv.DictReader(f))
 
 
-POS_MAP = {"n": "vocabulary", "adj": "adjectives", "adv": "adverbs"}
+POS_MAP = {"n": "vocabulary", "adj": "adjectives", "adv": "adverbs", "v": "verbs"}
+WANTED_WIKT_POS = {"n": "n", "adj": "adj", "adv": "adv", "v": "v"}
 
 
 def build_existing_lookup(existing):
@@ -219,7 +235,7 @@ def import_words(freq_rows, es_en, existing, target_count):
 
         # Prefer a pos_block whose Wiktionary POS matches the frequency
         # list's POS tag (loose match, since tagging conventions differ).
-        wanted_wikt_pos = {"n": "n", "adj": "adj", "adv": "adv"}[pos]
+        wanted_wikt_pos = WANTED_WIKT_POS[pos]
         candidates = [pb for pb in pos_blocks if pb["pos"] == wanted_wikt_pos] or pos_blocks
 
         gloss_result = None

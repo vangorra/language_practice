@@ -1,0 +1,19 @@
+{
+  "name": "spanish-vocab-matcher",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A matching game for building Spanish vocabulary, with dynamically generated verb conjugations.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/srs.test.mjs tests/history.test.mjs tests/dynamic-conjugator.test.mjs",
+    "validate-conjugations": "node scripts/validate_conjugations.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@jirimracek/conjugate-esp": "^2.3.6"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
