@@ -2,14 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createConjugationExpander } from '../js/dynamic-conjugator.js';
 
-test('expands a regular verb into present/preterite/imperfect cards', () => {
+test('expands a regular verb into cards for all 5 simple indicative tenses', () => {
   const { expandVerb } = createConjugationExpander(new Set());
   const entries = expandVerb({ es: 'hablar', en: 'to speak' });
 
   // present: 5 (yo/tú/él-ella/nosotros/ellos), preterite: 4 (nosotros
   // collides with present for an -ar verb, see below), imperfect: 4
-  // (yo/él-ella merged into one card).
-  assert.equal(entries.length, 13);
+  // (yo/él-ella merged), future: 5 (no collisions), conditional: 4
+  // (yo/él-ella merged, same -ía-ending collision as imperfect).
+  assert.equal(entries.length, 22);
 
   const present = entries.filter((e) => e.context.includes('present tense'));
   assert.equal(present.length, 5);
@@ -26,6 +27,18 @@ test('expands a regular verb into present/preterite/imperfect cards', () => {
   const mergedImperfect = imperfect.find((e) => e.context.includes('yo / él/ella'));
   assert.equal(mergedImperfect.es, 'hablaba');
   assert.equal(mergedImperfect.en, 'I/he/she used to speak');
+
+  const future = entries.filter((e) => e.context.includes('· future'));
+  assert.equal(future.length, 5, 'future has no yo/él-ella collision');
+  const yoFuture = future.find((e) => e.context.includes('· yo ·'));
+  assert.equal(yoFuture.es, 'hablaré');
+  assert.equal(yoFuture.en, 'I will speak');
+
+  const conditional = entries.filter((e) => e.context.includes('conditional'));
+  assert.equal(conditional.length, 4, 'yo and él/ella are merged into one conditional card, same as imperfect');
+  const mergedConditional = conditional.find((e) => e.context.includes('yo / él/ella'));
+  assert.equal(mergedConditional.es, 'hablaría');
+  assert.equal(mergedConditional.en, 'I/he/she would speak');
 });
 
 test('every generated id is unique and matches slugify(es)', async () => {
