@@ -50,7 +50,13 @@ let game; // assigned once createGame() resolves, in main()
 
 function cardClass(card, flash) {
   const classes = ['card'];
-  if (card.selected) {
+  // A card mid-match-resolution (see game.js resolveMatch/swapInReplacement)
+  // takes priority over the normal selected/flash styling: it's already
+  // been deselected by that point, and is instead fading out (still
+  // showing the match it just won) or fading in as its replacement.
+  if (card.removing) classes.push('card-removing');
+  else if (card.entering) classes.push('card-entering');
+  else if (card.selected) {
     if (flash === 'correct') classes.push('correct');
     else if (flash === 'wrong') classes.push('wrong');
     else classes.push('selected');
