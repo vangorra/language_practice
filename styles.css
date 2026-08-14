@@ -83,12 +83,6 @@ body {
   gap: 1.5rem;
 }
 
-@media (max-width: 560px) {
-  .board {
-    grid-template-columns: 1fr;
-  }
-}
-
 .column-title {
   text-align: center;
   font-size: 1rem;
@@ -499,6 +493,34 @@ body {
 @media (max-width: 480px) {
   body {
     padding: 1rem 0.75rem;
+  }
+
+  /* Keep the board two columns (left/right pairing is the whole point of
+     the game) even at narrow phone widths -- just tighten the gap and
+     shrink card padding/text so two columns comfortably fit. */
+  .board {
+    gap: 0.6rem;
+  }
+
+  .card-list {
+    gap: 0.4rem;
+    min-height: 0;
+  }
+
+  .card {
+    padding: 0.6rem 0.6rem;
+  }
+
+  .card-main {
+    font-size: 0.85rem;
+  }
+
+  .card.long-text .card-main {
+    font-size: 0.72rem;
+  }
+
+  .card-context {
+    font-size: 0.65rem;
   }
 
   .stats-grid {

@@ -27,13 +27,21 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      # Only main is ever deployed (see the "deploy" job below) -- these
+      # Pages-specific steps are skipped on other branches so they stay
+      # build+test-only CI, instead of producing an artifact nothing will
+      # use and a "deploy" job that's guaranteed to fail environment
+      # protection.
+      - if: github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+      - if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
