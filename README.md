@@ -10,9 +10,10 @@ you already know well.
 The deck (5,800+ static entries, before conjugations) isn't limited to
 single words — it also includes hundreds of short common phrases ("where
 is the bathroom?" → "¿dónde está el baño?"). On top of that, **every one
-of the ~1,090 verbs in the deck gets present/preterite/imperfect
-conjugations generated live**, the moment you first encounter that verb
-— not a hand-picked subset. English cards that could be confused with
+of the ~1,090 verbs in the deck gets all 5 simple indicative tense
+conjugations (present, preterite, imperfect, future, conditional)
+generated live**, the moment you first encounter that verb — not a
+hand-picked subset of verbs or tenses. English cards that could be confused with
 another sense of the same word — "to be" (ser vs. estar), "derecha"
 (direction vs. political right-wing) — show a small subheading under the
 main text for context.
@@ -61,8 +62,9 @@ reloads but is local to that browser/device.
 
 Rather than hand-picking a few dozen verbs to pre-conjugate, every verb
 infinitive in the deck (curated or imported, ~1,090 of them) can be
-conjugated — present, preterite, and imperfect tense, for yo/tú/él-ella/
-nosotros/ellos. That uses
+conjugated across all 5 simple indicative tenses the underlying engine
+exposes — present, preterite, imperfect, future, and conditional — for
+yo/tú/él-ella/nosotros/ellos. That uses
 [@jirimracek/conjugate-esp](https://github.com/jirimracek/conjugate-esp)
 (MIT), a real runtime dependency bundled into the app by `npm run build`
 (`scripts/build.mjs`, via esbuild) — not something used once offline and
@@ -88,10 +90,12 @@ progress for that id reattaches automatically. Nothing needs to track
 *when* or *in which session* a word was generated.
 
 The other real wrinkle is collisions, both systematic and incidental:
-Spanish's imperfect tense spells "yo" and "él/ella" identically for every
-verb, and -ar/-ir verbs spell their preterite and present "nosotros"
-forms identically — plus any two different verbs can incidentally land
-on the same conjugated form. `dynamic-conjugator.js` resolves all of
+Spanish's imperfect *and* conditional tenses both spell "yo" and
+"él/ella" identically for every verb (both end in an unstressed -a/-ía
+with no person marker), and -ar/-ir verbs spell their preterite and
+present "nosotros" forms identically — plus any two different verbs can
+incidentally land on the same conjugated form. `dynamic-conjugator.js`
+resolves all of
 these the same way: a shared `usedIds` set seeded with every id already
 in play, first writer wins, later duplicates for the same Spanish text
 are silently skipped rather than producing two colliding or ambiguous

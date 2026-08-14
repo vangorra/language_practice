@@ -19,12 +19,22 @@ import { slugify } from './slugify.js';
 
 const PERSON_INDEX = { yo: 0, 'tú': 1, 'él/ella': 2, nosotros: 3, ellos: 5 };
 
-// [conjugator tense key, mood, our tense label]
+// [conjugator tense key, mood, our tense label] -- all 5 simple indicative
+// tenses the engine exposes (IndicativoSubSimpleKey in its types), not a
+// hand-picked subset.
 const TENSES = [
   ['Presente', 'Indicativo', 'present tense'],
   ['PreteritoIndefinido', 'Indicativo', 'preterite (past)'],
   ['PreteritoImperfecto', 'Indicativo', 'imperfect (past)'],
+  ['FuturoImperfecto', 'Indicativo', 'future'],
+  ['CondicionalSimple', 'Indicativo', 'conditional'],
 ];
+
+// Spanish tenses whose yo and él/ella forms are always spelled identically
+// (both end in unstressed -a/-ía with no person marker) -- imperfect and
+// conditional. Handled by merging those two persons into one explicitly
+// labeled card instead of generating two that would collide on id anyway.
+const YO_ELLA_MERGED_TENSES = new Set(['PreteritoImperfecto', 'CondicionalSimple']);
 
 // English present-tense 3rd-person-singular is irregular for a handful of
 // very common verbs; everything else follows the regular spelling rules
@@ -61,12 +71,18 @@ function englishGloss(infinitiveGloss, person, tenseKey) {
     const subject = { yo: 'I', 'tú': 'you', 'él/ella': 'he/she', nosotros: 'we', ellos: 'they' }[person];
     return `${subject} did ${bare}`;
   }
-  // Imperfect: yo and él/ella are always spelled identically in Spanish
-  // (see the merged 'yo / él/ella' person below), so the English gloss
-  // covers both explicitly.
-  if (person === 'yo / él/ella') return `I/he/she used to ${bare}`;
+  if (tenseKey === 'FuturoImperfecto') {
+    const subject = { yo: 'I', 'tú': 'you', 'él/ella': 'he/she', nosotros: 'we', ellos: 'they' }[person];
+    return `${subject} will ${bare}`;
+  }
+  // Imperfect and conditional: yo and él/ella are always spelled identically
+  // in Spanish (see YO_ELLA_MERGED_TENSES / the merged 'yo / él/ella' person
+  // below), so the English gloss covers both explicitly.
+  if (person === 'yo / él/ella') {
+    return tenseKey === 'CondicionalSimple' ? `I/he/she would ${bare}` : `I/he/she used to ${bare}`;
+  }
   const subject = { 'tú': 'you', nosotros: 'we', ellos: 'they' }[person];
-  return `${subject} used to ${bare}`;
+  return tenseKey === 'CondicionalSimple' ? `${subject} would ${bare}` : `${subject} used to ${bare}`;
 }
 
 /**
@@ -100,10 +116,9 @@ export function createConjugationExpander(usedIds) {
       const forms = entry.conjugation?.[mood]?.[tenseKey];
       if (!forms || forms.length < 6) continue;
 
-      const persons =
-        tenseKey === 'PreteritoImperfecto'
-          ? [['yo / él/ella', 0], ['tú', 1], ['nosotros', 3], ['ellos', 5]]
-          : [['yo', PERSON_INDEX.yo], ['tú', PERSON_INDEX['tú']], ['él/ella', PERSON_INDEX['él/ella']], ['nosotros', PERSON_INDEX.nosotros], ['ellos', PERSON_INDEX.ellos]];
+      const persons = YO_ELLA_MERGED_TENSES.has(tenseKey)
+        ? [['yo / él/ella', 0], ['tú', 1], ['nosotros', 3], ['ellos', 5]]
+        : [['yo', PERSON_INDEX.yo], ['tú', PERSON_INDEX['tú']], ['él/ella', PERSON_INDEX['él/ella']], ['nosotros', PERSON_INDEX.nosotros], ['ellos', PERSON_INDEX.ellos]];
 
       for (const [person, idx] of persons) {
         const es = forms[idx];
