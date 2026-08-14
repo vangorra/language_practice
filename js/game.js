@@ -4,8 +4,9 @@ import { getAllWordStates, putWordState, clearWordStates, getHistoryAll, putHist
 import { dateKey, addReviewToRecord, computeStreak, computeLongestStreak, lastNDaysSeries, totals } from './history.js';
 import { createConjugationExpander } from './dynamic-conjugator.js';
 
-const MISMATCH_FLASH_MS = 500;
-const MATCH_FLASH_MS = 350;
+const MATCH_FLASH_MS = 350; // green highlight, before the fade-out starts
+const REMOVE_FADE_MS = 220; // fade-out duration for a just-matched card
+const ENTER_FADE_MS = 250; // fade-in duration for the card that replaces it
 const HISTORY_CHART_DAYS = 30;
 
 /** @param {number} misses */
@@ -79,6 +80,12 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     return new Set(enColumn.map((c) => c.wordId));
   }
 
+  function activeIdsExcluding(excludeId) {
+    const ids = activeIds();
+    ids.delete(excludeId);
+    return ids;
+  }
+
   function fillPool() {
     while (enColumn.length < poolSize) {
       const word = pickNextWord(allWords, states, activeIds());
@@ -112,8 +119,14 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     return counts;
   }
 
+  // Unlike a correct match (which clears the selection itself once it moves
+  // into the fade-out phase, see attemptMatch), a wrong pairing is left
+  // selected on purpose: both ids stay set with a non-equal pair for as
+  // long as the player leaves it there, so the red flash persists until
+  // their *next* selection clears it (see selectCard) rather than reverting
+  // on a fixed timer.
   function currentFlash() {
-    if (!lockInput || selectedEnId == null || selectedEsId == null) return null;
+    if (selectedEnId == null || selectedEsId == null) return null;
     return selectedEnId === selectedEsId ? 'correct' : 'wrong';
   }
 
@@ -135,6 +148,16 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
   /** @param {'en'|'es'} side */
   function selectCard(side, wordId) {
     if (lockInput) return;
+
+    // A wrong pair stays on screen in red (see currentFlash) until the
+    // player's next selection anywhere -- that click's first job is to
+    // clear it back to normal, *then* register itself as a fresh, single
+    // selection (not to also try completing a pairing against the
+    // just-cleared other side).
+    if (selectedEnId != null && selectedEsId != null && selectedEnId !== selectedEsId) {
+      selectedEnId = null;
+      selectedEsId = null;
+    }
 
     if (side === 'en') {
       if (selectedEnId === wordId) {
@@ -164,42 +187,77 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     const esId = selectedEsId;
 
     if (enId === esId) {
-      // Correct match.
+      // Correct match: green flash, then fade the two matched cards out in
+      // place, then swap in a replacement (fading it in) at those exact
+      // same board positions. Every other card's index never changes, so
+      // it never has to shift to fill a gap -- see resolveMatch below.
       lockInput = true;
-      emit(); // let the UI show the "correct" flash briefly before removal
-      setTimeout(() => {
-        const enCard = enColumn.find((c) => c.wordId === enId);
-        const esCard = esColumn.find((c) => c.wordId === esId);
-        const misses = Math.max(enCard?.misses ?? 0, esCard?.misses ?? 0);
-        const wasNewWord = states[enId].timesSeen === 0;
-
-        states[enId] = reviewWord(states[enId], misses);
-        putWordState(enId, states[enId]).catch((err) => console.warn('Failed to save word state', err));
-        recordHistory(bucketFromMisses(misses), wasNewWord);
-
-        removeWord(enId);
-        selectedEnId = null;
-        selectedEsId = null;
-        lockInput = false;
-        fillPool();
-        emit();
-      }, MATCH_FLASH_MS);
+      emit(); // shows the "correct" flash (currentFlash) immediately
+      setTimeout(() => resolveMatch(enId, esId), MATCH_FLASH_MS);
       return;
     }
 
-    // Wrong pairing: both involved cards take a "miss" for this appearance.
-    lockInput = true;
+    // Wrong pairing: both involved cards take a "miss" for this appearance,
+    // then stay selected (and red, via currentFlash) with input left
+    // unlocked -- the player's next selection is what clears it back to
+    // normal (see selectCard), not a timer.
     const enCard = enColumn.find((c) => c.wordId === enId);
     const esCard = esColumn.find((c) => c.wordId === esId);
     if (enCard) enCard.misses += 1;
     if (esCard) esCard.misses += 1;
     emit();
-    setTimeout(() => {
-      selectedEnId = null;
-      selectedEsId = null;
-      lockInput = false;
-      emit();
-    }, MISMATCH_FLASH_MS);
+  }
+
+  /** Phase 2 of a correct match: record the review, then start the fade-out. */
+  function resolveMatch(enId, esId) {
+    const enCard = enColumn.find((c) => c.wordId === enId);
+    const esCard = esColumn.find((c) => c.wordId === esId);
+    const misses = Math.max(enCard?.misses ?? 0, esCard?.misses ?? 0);
+    const wasNewWord = states[enId].timesSeen === 0;
+
+    states[enId] = reviewWord(states[enId], misses);
+    putWordState(enId, states[enId]).catch((err) => console.warn('Failed to save word state', err));
+    recordHistory(bucketFromMisses(misses), wasNewWord);
+
+    if (enCard) enCard.removing = true;
+    if (esCard) esCard.removing = true;
+    selectedEnId = null;
+    selectedEsId = null;
+    emit();
+
+    setTimeout(() => swapInReplacement(enId, esId), REMOVE_FADE_MS);
+  }
+
+  /** Phase 3: swap the faded-out slot for a freshly picked word, in place, and let it fade in. */
+  function swapInReplacement(enId, esId) {
+    const enIdx = enColumn.findIndex((c) => c.wordId === enId);
+    const esIdx = esColumn.findIndex((c) => c.wordId === esId);
+    const nextWord = pickNextWord(allWords, states, activeIdsExcluding(enId));
+
+    if (enIdx === -1 || esIdx === -1 || !nextWord) {
+      // Nothing to replace it with (deck exhausted) -- fall back to just
+      // shrinking the pool by this one slot.
+      if (enIdx !== -1) enColumn.splice(enIdx, 1);
+      if (esIdx !== -1) esColumn.splice(esIdx, 1);
+    } else {
+      enColumn[enIdx] = { wordId: nextWord.id, misses: 0, entering: true };
+      esColumn[esIdx] = { wordId: nextWord.id, misses: 0, entering: true };
+      expandVerbIfNeeded(nextWord);
+    }
+
+    lockInput = false;
+    emit();
+
+    if (nextWord) setTimeout(() => clearEntering(nextWord.id), ENTER_FADE_MS);
+  }
+
+  /** Phase 4: drop the transient "entering" flag once its fade-in has played, so an unrelated re-render later doesn't replay it. */
+  function clearEntering(wordId) {
+    const enCard = enColumn.find((c) => c.wordId === wordId);
+    const esCard = esColumn.find((c) => c.wordId === wordId);
+    if (enCard) delete enCard.entering;
+    if (esCard) delete esCard.entering;
+    emit();
   }
 
   /**

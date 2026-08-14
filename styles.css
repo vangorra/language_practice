@@ -158,6 +158,48 @@ body {
   background: color-mix(in srgb, var(--wrong) 20%, var(--surface));
 }
 
+/* Correct-match resolution (see game.js resolveMatch/swapInReplacement):
+   the matched card fades out in place -- still green, since it just won --
+   then its replacement fades in at that same board position. Every other
+   card's index is untouched by this, so nothing else has to shift to fill
+   a gap. Keyframe animations (not transitions) are used deliberately: this
+   app re-renders columns by rebuilding their DOM from scratch, and a
+   transition only plays on a property change to an *already-mounted*
+   element, whereas a keyframe animation plays as soon as the element (with
+   this class) is inserted, mount or not. */
+.card.card-removing {
+  border-color: var(--correct);
+  background: color-mix(in srgb, var(--correct) 20%, var(--surface));
+  pointer-events: none;
+  animation: card-fade-out 220ms ease forwards;
+}
+
+.card.card-entering {
+  animation: card-fade-in 250ms ease;
+}
+
+@keyframes card-fade-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes card-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .controls {
   max-width: 760px;
   margin: 2rem auto 0;
