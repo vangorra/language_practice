@@ -28,6 +28,7 @@ const LEARNING_STEPS_MIN = [1, 10]; // graduation steps, in minutes
 const MIN_EASE = 1.3;
 const DEFAULT_EASE = 2.5;
 const FAMILIAR_THRESHOLD_MIN = 21 * DAY; // matches classic SM-2's "mature" cutoff
+const MANUAL_MASTER_INTERVAL_MIN = 30 * DAY; // where a manually-marked word starts
 
 /** A fresh, never-seen state for a word. */
 export function createWordState(now = Date.now()) {
@@ -42,6 +43,7 @@ export function createWordState(now = Date.now()) {
     timesSeen: 0,
     timesCorrect: 0,
     timesWrong: 0,
+    manuallyMastered: false,
   };
 }
 
@@ -54,10 +56,42 @@ function qualityFromMisses(misses) {
 
 /** Which mastery tier a word is currently in, for display/reporting. */
 export function tierOf(state) {
+  if (state.manuallyMastered) return TIER.MASTERED;
   if (state.timesSeen === 0) return TIER.NEW;
   if (state.intervalMin < DAY) return TIER.LEARNING;
   if (state.intervalMin < FAMILIAR_THRESHOLD_MIN) return TIER.FAMILIAR;
   return TIER.MASTERED;
+}
+
+/**
+ * User override: "I already know this, stop drilling it." Used by the
+ * card long-press menu for words the player already knows from elsewhere
+ * (e.g. finished a Duolingo unit covering them) and doesn't want to spend
+ * early repetitions on. Jumps straight to a long, mastered-scale interval
+ * rather than making the player earn it through normal reviews.
+ */
+export function markKnown(state, now = Date.now()) {
+  return {
+    ...state,
+    ef: Math.max(state.ef, DEFAULT_EASE),
+    intervalMin: MANUAL_MASTER_INTERVAL_MIN,
+    reps: Math.max(state.reps, 4),
+    learningStep: LEARNING_STEPS_MIN.length,
+    dueAt: now + MANUAL_MASTER_INTERVAL_MIN,
+    lastSeenAt: now,
+    timesSeen: Math.max(state.timesSeen, 1),
+    timesCorrect: Math.max(state.timesCorrect, 1),
+    manuallyMastered: true,
+  };
+}
+
+/**
+ * Undo a manual "known" mark and forget this word's history entirely,
+ * sending it back through the deck as if brand new. Used when the player
+ * marked something known but it turns out they need practice after all.
+ */
+export function markNeedsPractice(now = Date.now()) {
+  return createWordState(now);
 }
 
 /**

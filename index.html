@@ -12,31 +12,98 @@
     <p class="subtitle">Match each English word to its Spanish translation.</p>
   </header>
 
-  <section id="stats" class="stats-bar" aria-label="Progress summary"></section>
+  <nav class="tab-bar" aria-label="Views">
+    <button type="button" class="tab-btn" data-tab="practice" aria-pressed="true">Practice</button>
+    <button type="button" class="tab-btn" data-tab="words" aria-pressed="false">Word List</button>
+    <button type="button" class="tab-btn" data-tab="stats" aria-pressed="false">Stats</button>
+  </nav>
 
-  <main class="board">
-    <div class="column" aria-label="English words">
-      <h2 class="column-title">English</h2>
-      <div id="en-column" class="card-list"></div>
+  <main id="panel-practice" class="panel">
+    <section id="stats" class="stats-bar" aria-label="Progress summary"></section>
+
+    <div class="board">
+      <div class="column" aria-label="English words">
+        <h2 class="column-title">English</h2>
+        <div id="en-column" class="card-list"></div>
+      </div>
+      <div class="column" aria-label="Spanish words">
+        <h2 class="column-title">Español</h2>
+        <div id="es-column" class="card-list"></div>
+      </div>
     </div>
-    <div class="column" aria-label="Spanish words">
-      <h2 class="column-title">Español</h2>
-      <div id="es-column" class="card-list"></div>
+    <p class="hint">Tip: press and hold a card to mark it known or reset its practice.</p>
+
+    <footer class="controls">
+      <label for="pool-size">
+        Cards on screen:
+        <select id="pool-size">
+          <option value="4">4</option>
+          <option value="6" selected>6</option>
+          <option value="8">8</option>
+          <option value="10">10</option>
+        </select>
+      </label>
+      <button id="reset-btn" type="button">Reset all progress</button>
+    </footer>
+  </main>
+
+  <main id="panel-words" class="panel" hidden>
+    <div class="word-list-controls">
+      <input id="word-search" type="search" placeholder="Search English or Spanish…" aria-label="Search words" />
+      <select id="tier-filter" aria-label="Filter by tier">
+        <option value="all">All tiers</option>
+        <option value="new">New</option>
+        <option value="learning">Learning</option>
+        <option value="familiar">Familiar</option>
+        <option value="mastered">Mastered</option>
+      </select>
+      <label class="checkbox-label">
+        <input id="seen-only" type="checkbox" checked />
+        Only words I've practiced
+      </label>
+    </div>
+    <div class="table-scroll">
+      <table id="word-table" class="word-table">
+        <thead>
+          <tr>
+            <th data-sort="en">English</th>
+            <th data-sort="es">Español</th>
+            <th data-sort="category">Category</th>
+            <th data-sort="tier">Tier</th>
+            <th data-sort="timesSeen">Seen</th>
+            <th data-sort="accuracy">Accuracy</th>
+            <th data-sort="intervalMin">Interval</th>
+            <th data-sort="dueAt">Next review</th>
+            <th data-sort="lastSeenAt">Last seen</th>
+          </tr>
+        </thead>
+        <tbody id="word-table-body"></tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <button id="page-prev" type="button">← Prev</button>
+      <span id="page-info"></span>
+      <button id="page-next" type="button">Next →</button>
     </div>
   </main>
 
-  <footer class="controls">
-    <label for="pool-size">
-      Cards on screen:
-      <select id="pool-size">
-        <option value="4">4</option>
-        <option value="6" selected>6</option>
-        <option value="8">8</option>
-        <option value="10">10</option>
-      </select>
-    </label>
-    <button id="reset-btn" type="button">Reset progress</button>
-  </footer>
+  <main id="panel-stats" class="panel" hidden>
+    <div class="streak-row">
+      <div class="streak-card">
+        <div class="streak-number" id="streak-current">0</div>
+        <div class="streak-label">Day streak</div>
+      </div>
+      <div class="streak-card">
+        <div class="streak-number" id="streak-longest">0</div>
+        <div class="streak-label">Longest streak</div>
+      </div>
+    </div>
+    <h2 class="section-title">Reviews per day (last 30 days)</h2>
+    <div id="chart-container" class="chart-container"></div>
+    <dl class="stats-grid" id="stats-grid"></dl>
+  </main>
+
+  <div id="card-menu" class="card-menu" hidden role="menu"></div>
 
   <script type="module" src="js/main.js"></script>
 </body>

@@ -5,6 +5,8 @@ import {
   reviewWord,
   tierOf,
   pickNextWord,
+  markKnown,
+  markNeedsPractice,
   TIER,
   MINUTE,
   DAY,
@@ -87,4 +89,49 @@ test('pickNextWord never returns a word that is already active', () => {
     const pick = pickNextWord(words, states, new Set([1, 2]), { now });
     assert.equal(pick.id, 3);
   }
+});
+
+test('markKnown immediately jumps a word to the MASTERED tier', () => {
+  const fresh = createWordState(0);
+  const known = markKnown(fresh, 1000);
+  assert.equal(tierOf(known), TIER.MASTERED);
+  assert.equal(known.manuallyMastered, true);
+  assert.ok(known.dueAt > 1000, 'should be scheduled well into the future');
+  assert.equal(known.timesSeen, 1, 'counts as having been "seen" once for reporting purposes');
+});
+
+test('markKnown works even on a word that already has review history', () => {
+  let s = createWordState(0);
+  s = reviewWord(s, 0, 0); // one clean review, still in early learning steps
+  const known = markKnown(s, 5000);
+  assert.equal(tierOf(known), TIER.MASTERED);
+  assert.ok(known.timesSeen >= s.timesSeen, "shouldn't lose review history");
+});
+
+test('markNeedsPractice forgets everything and starts fresh', () => {
+  let s = createWordState(0);
+  s = reviewWord(s, 0, 0);
+  s = markKnown(s, 1000);
+  const forgotten = markNeedsPractice(2000);
+  assert.equal(tierOf(forgotten), TIER.NEW);
+  assert.equal(forgotten.manuallyMastered, false);
+  assert.equal(forgotten.timesSeen, 0);
+});
+
+test('pickNextWord treats a manually-known word like a mastered one: not due, occasionally rechecked', () => {
+  const words = [{ id: 1 }, { id: 2 }];
+  const now = 10_000;
+  const states = {
+    1: markKnown(createWordState(now), now), // manually known, due far in the future
+    2: createWordState(now), // brand new
+  };
+  // With the new-word cap at 0 and mastery-check chance forced to 1, the
+  // only remaining candidate is the manually-known word.
+  const pick = pickNextWord(words, states, new Set(), {
+    now,
+    newWordCap: 0,
+    masteryCheckChance: 1,
+    rng: () => 0,
+  });
+  assert.equal(pick.id, 1);
 });
