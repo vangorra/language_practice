@@ -32,6 +32,24 @@ Press and hold any card to open a small menu for marking that word
 the usual ramp-up — handy for words you already know from elsewhere) or
 resetting it back to fresh/new.
 
+On a phone, a match or mismatch also gives distinct haptic feedback — a
+short tick for a correct match, a firmer double-buzz for a wrong one (see
+`vibrateFor` in `js/main.js`) — via the Vibration API. Android Chrome/
+Firefox support this; iOS Safari has never implemented the Vibration API
+at all, so it's silently a no-op there rather than an error.
+
+## Installing it as an app
+
+This is an installable PWA: on Android Chrome, an "Install app" / "Add to
+Home Screen" prompt shows up automatically (or is available from the
+browser menu), and it launches full-screen with no browser chrome from
+then on. On iOS Safari, use Share → Add to Home Screen — iOS doesn't use
+the web manifest for this, so it relies on the `apple-touch-icon` and
+`apple-mobile-web-app-*` meta tags in `index.html` instead. See `manifest.webmanifest`, `sw.js`, and the icons under `icons/` — the
+icon files are copied into `dist/` as-is by `scripts/build.mjs`, but
+`sw.js` gets a build id spliced into its cache name at build time (see
+its own comment for why).
+
 ## Running it
 
 This app has a real npm dependency (see "How conjugations work" below),
@@ -46,7 +64,8 @@ npx serve dist      # or: python3 -m http.server 8000 --directory dist
 ```
 
 Then visit the printed URL. Works well on a phone browser too — the
-layout is responsive, and long-press works with touch.
+layout is responsive, long-press works with touch, matches/mismatches
+vibrate, and it's installable (see "Installing it as an app" above).
 
 **Live version**: pushes to this repo's branch build and deploy
 automatically to GitHub Pages (see `.github/workflows/deploy.yml`). If
@@ -56,7 +75,9 @@ be flipped from a workflow file or from here.
 
 Progress is saved to **IndexedDB** in your browser (one record per word,
 not one giant blob — see "Why IndexedDB" below), so it persists across
-reloads but is local to that browser/device.
+reloads but is local to that browser/device. Installing as an app doesn't
+change this: it's still the same browser storage under the hood, just
+launched without browser chrome.
 
 ## How conjugations work
 
@@ -152,6 +173,9 @@ the session, just without persistence.
 ```
 index.html               Page shell / layout (Practice / Word List / Stats tabs)
 styles.css                All styling
+manifest.webmanifest      PWA manifest (installable "Add to Home Screen")
+sw.js                     App-shell service worker (see "Installing it as an app")
+icons/                    App icons (any + maskable + Apple touch icon)
 js/words.js               Hand-curated word/phrase entries (merges in words-imported.js)
 js/words-imported.js      Auto-generated frequency-sourced vocabulary (see scripts/import_vocab.py)
 js/slugify.js             Shared id-from-Spanish-text scheme (static AND dynamic entries)

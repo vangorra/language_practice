@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Spanish Vocab Matcher</title>
   <link rel="stylesheet" href="styles.css" />
+
+  <!-- Installable as a home-screen app -- see manifest.webmanifest and
+       sw.js (registered in js/main.js). -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#4f46e5" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <!-- iOS ignores the web manifest for "Add to Home Screen"; these are its
+       separate, older mechanism for the same thing. -->
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Vocab Matcher" />
 </head>
 <body>
   <header class="app-header">
