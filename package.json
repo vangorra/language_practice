@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node --test tests/srs.test.mjs tests/history.test.mjs tests/dynamic-conjugator.test.mjs",
+    "test": "node --test --test-timeout=45000 tests/*.test.mjs",
+    "test:coverage": "c8 --check-coverage npm test",
     "validate-conjugations": "node scripts/validate_conjugations.mjs"
   },
   "license": "MIT",
@@ -14,6 +15,9 @@
     "@jirimracek/conjugate-esp": "^2.3.6"
   },
   "devDependencies": {
-    "esbuild": "^0.28.2"
+    "c8": "^12.0.0",
+    "esbuild": "^0.28.2",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^30.0.1"
   }
 }

@@ -26,7 +26,7 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run build
-      - run: npm test
+      - run: npm run test:coverage
       # Only main is ever deployed (see the "deploy" job below) -- these
       # Pages-specific steps are skipped on other branches so they stay
       # build+test-only CI, instead of producing an artifact nothing will

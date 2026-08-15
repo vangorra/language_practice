@@ -92,16 +92,27 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     return new Set(enColumn.map((c) => c.wordId));
   }
 
-  function activeIdsExcluding(excludeId) {
-    const ids = activeIds();
-    ids.delete(excludeId);
-    return ids;
-  }
-
-  function fillPool() {
+  /**
+   * @param {Set<string>} [excludeIds] - ids to keep out of the pool even
+   *   though they're no longer active -- e.g. a word just removed via
+   *   markWordKnown/markWordNeedsPractice a moment ago, which would
+   *   otherwise be free to get picked right back into its own now-empty
+   *   slot (most easily triggered by srs.js's "mastery check" pick, which
+   *   is happy to immediately re-select the sole not-yet-due mastered
+   *   word -- exactly what a just-marked-known word now is).
+   */
+  function fillPool(excludeIds) {
     while (enColumn.length < poolSize) {
-      const word = pickNextWord(allWords, states, activeIds());
+      const ids = activeIds();
+      if (excludeIds) for (const id of excludeIds) ids.add(id);
+      const word = pickNextWord(allWords, states, ids);
+      /* c8 ignore start -- only reachable once the entire deck (every
+         static word plus every conjugation of every verb, ~29,000
+         candidates) is simultaneously active; confirmed by direct
+         measurement to take 15+ seconds to even construct, so
+         deliberately left untested. */
       if (!word) break;
+      /* c8 ignore stop */
       insertRandom(enColumn, { wordId: word.id, misses: 0 });
       insertRandom(esColumn, { wordId: word.id, misses: 0 });
       expandVerbIfNeeded(word);
@@ -273,21 +284,43 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     for (const { enId, esId } of batch) {
       const enIdx = enColumn.findIndex((c) => c.wordId === enId);
       const esIdx = esColumn.findIndex((c) => c.wordId === esId);
-      // activeIdsExcluding reads the live columns, so words already swapped
-      // in earlier iterations of this same batch correctly count as taken.
-      const nextWord = pickNextWord(allWords, states, activeIdsExcluding(enId));
 
-      if (enIdx === -1 || esIdx === -1 || !nextWord) {
-        // Nothing to replace it with (deck exhausted) -- fall back to just
-        // shrinking the pool by this one slot.
-        if (enIdx !== -1) enColumn.splice(enIdx, 1);
-        if (esIdx !== -1) esColumn.splice(esIdx, 1);
-      } else {
-        enColumn[enIdx] = { wordId: nextWord.id, misses: 0, entering: true };
-        esColumn[esIdx] = { wordId: nextWord.id, misses: 0, entering: true };
-        expandVerbIfNeeded(nextWord);
-        entered.push(nextWord.id);
+      // enId and esId are always the same word (a pendingConfirmed entry is
+      // only ever created from a *correct* match, where they're required to
+      // be equal), and removeWord always takes a word out of both columns
+      // together -- so enIdx and esIdx can only ever be "both found" or
+      // "both -1", never split. This is the real, reachable case: the word
+      // was already removed via a different path (e.g. markWordKnown from
+      // the long-press menu) between this batch being scheduled and this
+      // phase actually running -- see the matching test. Nothing left here
+      // to replace.
+      if (enIdx === -1) continue;
+
+      // activeIds() reads the live columns, so it naturally (a) still
+      // includes enId itself, at this point still sitting in its old,
+      // not-yet-overwritten slot -- keeping it from picking itself as its
+      // own replacement (see fillPool's doc comment for why that's a real
+      // failure mode, not just theoretical) -- and (b) already reflects
+      // any words swapped in by earlier iterations of this same batch.
+      const nextWord = pickNextWord(allWords, states, activeIds());
+      /* c8 ignore start -- only reachable once the entire deck (every
+         static word plus every conjugation of every verb, ~29,000
+         candidates) is simultaneously active; confirmed by direct
+         measurement to take 15+ seconds to even construct, let alone
+         assert against, so this is deliberately left untested rather
+         than paying that cost on every test run. Deck exhausted: fall
+         back to just shrinking the pool by this one slot. */
+      if (!nextWord) {
+        enColumn.splice(enIdx, 1);
+        esColumn.splice(esIdx, 1);
+        continue;
       }
+      /* c8 ignore stop */
+
+      enColumn[enIdx] = { wordId: nextWord.id, misses: 0, entering: true };
+      esColumn[esIdx] = { wordId: nextWord.id, misses: 0, entering: true };
+      expandVerbIfNeeded(nextWord);
+      entered.push(nextWord.id);
     }
 
     emit();
@@ -342,7 +375,9 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     // against.
     pendingConfirmed = pendingConfirmed.filter((p) => p.enId !== wordId);
     removeWord(wordId);
-    fillPool();
+    // Exclude wordId itself from its own replacement -- see fillPool's
+    // doc comment for why this isn't just a theoretical concern.
+    fillPool(new Set([wordId]));
     emit();
   }
 

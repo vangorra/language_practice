@@ -5,6 +5,7 @@ import {
   reviewWord,
   tierOf,
   pickNextWord,
+  weightedPick,
   markKnown,
   markNeedsPractice,
   TIER,
@@ -116,6 +117,106 @@ test('markNeedsPractice forgets everything and starts fresh', () => {
   assert.equal(tierOf(forgotten), TIER.NEW);
   assert.equal(forgotten.manuallyMastered, false);
   assert.equal(forgotten.timesSeen, 0);
+});
+
+test('weightedPick chooses the item whose cumulative weight range contains the roll', () => {
+  const items = ['a', 'b', 'c'];
+  const weights = [1, 2, 3]; // total 6
+  assert.equal(weightedPick(items, weights, () => 0), 'a'); // roll 0 -> r=0, first item
+  assert.equal(weightedPick(items, weights, () => 1 / 6 + 1e-9), 'b'); // just past a's slice
+  assert.equal(weightedPick(items, weights, () => 0.99), 'c'); // deep into c's slice
+});
+
+test('weightedPick falls back to a uniform pick when every weight is non-positive', () => {
+  const items = ['a', 'b', 'c'];
+  const weights = [0, 0, 0];
+  assert.equal(weightedPick(items, weights, () => 0), 'a');
+  assert.equal(weightedPick(items, weights, () => 0.9), 'c');
+});
+
+test('weightedPick falls back to the last item if a misbehaving rng never lets the cumulative weight reach the roll', () => {
+  // Math.random() (the real rng) can never return >= 1, so this path is
+  // unreachable through normal use -- exercised directly here as a defensive
+  // guarantee that weightedPick still returns *something* rather than
+  // undefined even if it were ever called with a bad rng.
+  const items = ['a', 'b', 'c'];
+  const weights = [1, 1, 1];
+  // rng() must exceed 1 so the roll (r = rng() * total) still has leftover
+  // after every weight has been subtracted -- otherwise the loop's own
+  // `r <= 0` branch returns first (as it would for a well-behaved rng that
+  // never reaches 1), never reaching this fallback.
+  assert.equal(weightedPick(items, weights, () => 1.5), 'c');
+});
+
+test('pickNextWord introduces a new word immediately when nothing is due yet', () => {
+  const words = [{ id: 1 }, { id: 2 }];
+  const now = 0;
+  const states = { 1: createWordState(now), 2: createWordState(now) }; // both brand new, nothing due
+  const pick = pickNextWord(words, states, new Set(), { now, newWordCap: 2, rng: () => 0.99 });
+  assert.ok([1, 2].includes(pick.id));
+});
+
+test('pickNextWord can prefer a new word over a due one when the newWordChance roll succeeds', () => {
+  const words = [{ id: 1 }, { id: 2 }];
+  const now = 1000;
+  const states = {
+    1: createWordState(now), // brand new
+    2: { ...createWordState(now), timesSeen: 1, dueAt: now - 1 }, // due
+  };
+  const pick = pickNextWord(words, states, new Set(), { now, newWordCap: 2, newWordChance: 1, rng: () => 0 });
+  assert.equal(pick.id, 1, 'a rng roll under newWordChance should pick the new word despite a due one existing');
+});
+
+test('pickNextWord picks the due word when the newWordChance roll fails', () => {
+  const words = [{ id: 1 }, { id: 2 }];
+  const now = 1000;
+  const states = {
+    1: createWordState(now), // brand new
+    2: { ...createWordState(now), timesSeen: 1, dueAt: now - 1 }, // due
+  };
+  const pick = pickNextWord(words, states, new Set(), { now, newWordCap: 2, newWordChance: 0, rng: () => 0.99 });
+  assert.equal(pick.id, 2);
+});
+
+test('pickNextWord introduces a new word past the cap when nothing due or masteredNotDue is available', () => {
+  const words = [{ id: 1 }, { id: 2 }];
+  const now = 0;
+  const states = { 1: createWordState(now), 2: createWordState(now) }; // both brand new
+  // Cap of 0 with one already "active" (counted via a fake active state) would
+  // normally forbid introducing more -- but with nothing due and nothing
+  // mastered-not-due, the fallback should still hand back a new word instead
+  // of stalling.
+  const pick = pickNextWord(words, states, new Set(), { now, newWordCap: 0, rng: () => 0.99 });
+  assert.ok([1, 2].includes(pick.id));
+});
+
+test('pickNextWord falls back to the earliest-seen mastered word when the mastery-check roll fails and nothing else qualifies', () => {
+  const words = [{ id: 1 }, { id: 2 }];
+  const now = 100_000;
+  const states = {
+    1: { ...markKnown(createWordState(now), now), lastSeenAt: 1000 },
+    2: { ...markKnown(createWordState(now), now), lastSeenAt: 2000 },
+  };
+  const pick = pickNextWord(words, states, new Set(), {
+    now,
+    newWordCap: 0,
+    masteryCheckChance: 0,
+    rng: () => 0.99,
+  });
+  assert.equal(pick.id, 1, 'should fall back to the least-recently-seen mastered word');
+});
+
+test('pickNextWord falls back to the least-recently-seen candidate when nothing is due, new, or mastered-not-due', () => {
+  const words = [{ id: 1 }, { id: 2 }];
+  const now = 100_000;
+  // Both seen before, not due yet, and not mastered -- e.g. mid-way through
+  // learning steps with a future dueAt.
+  const states = {
+    1: { ...createWordState(now), timesSeen: 1, dueAt: now + 10_000, lastSeenAt: 500 },
+    2: { ...createWordState(now), timesSeen: 1, dueAt: now + 10_000, lastSeenAt: 1500 },
+  };
+  const pick = pickNextWord(words, states, new Set(), { now, newWordCap: 0, rng: () => 0.99 });
+  assert.equal(pick.id, 1, 'should fall back to the least-recently-seen candidate');
 });
 
 test('pickNextWord treats a manually-known word like a mastered one: not due, occasionally rechecked', () => {

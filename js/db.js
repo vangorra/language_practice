@@ -80,14 +80,9 @@ function withStore(storeName, mode, fn) {
       // shapes regardless of which path ran.
       const store = useMemoryFallback()[storeName === WORD_STATES_STORE ? 'wordStates' : 'history'];
       const shimResult = fn({
-        get: (key) => ({ result: store.get(key) }),
         getAll: () => ({ result: [...store.values()] }),
         put: (value) => {
           store.set(value.id ?? value.date, value);
-          return {};
-        },
-        delete: (key) => {
-          store.delete(key);
           return {};
         },
         clear: () => {
@@ -118,7 +113,7 @@ function withStore(storeName, mode, fn) {
 export async function getAllWordStates() {
   const rows = await withStore(WORD_STATES_STORE, 'readonly', (store) => store.getAll());
   const map = {};
-  for (const row of rows ?? []) {
+  for (const row of rows) {
     const { id, ...state } = row;
     map[id] = state;
   }
@@ -138,7 +133,7 @@ export function clearWordStates() {
 export async function getHistoryAll() {
   const rows = await withStore(HISTORY_STORE, 'readonly', (store) => store.getAll());
   const map = {};
-  for (const row of rows ?? []) {
+  for (const row of rows) {
     const { date, ...rest } = row;
     map[date] = rest;
   }
