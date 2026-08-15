@@ -110,7 +110,7 @@ body {
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
-  text-align: left;
+  text-align: center;
   transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
   /* Long-press-friendly: no text-selection callout or native context menu flicker on hold. */
   touch-action: manipulation;
@@ -122,15 +122,16 @@ body {
 .card-main {
   font-size: 1rem;
   line-height: 1.3;
-  /* Reserve 2 lines' worth of height (2 x line-height) regardless of
+  /* Reserve 3 lines' worth of height (3 x line-height) regardless of
      whether this particular card's text needs it, so a short single-word
      card and a long-phrase card are the same height instead of the list
      looking jagged -- and so a card swapping to a longer/shorter word on
      match doesn't change height. In em units so it scales automatically
      with the smaller font-size .long-text and the mobile breakpoint use. */
-  min-height: 2.6em;
+  min-height: 3.9em;
   display: flex;
-  align-items: center;
+  align-items: center; /* vertical centering within the reserved height */
+  justify-content: center; /* horizontal centering (text-align, above, handles wrapped lines) */
 }
 
 .card.long-text .card-main {
