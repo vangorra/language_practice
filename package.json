@@ -4,6 +4,9 @@
   "private": true,
   "description": "A matching game for building Spanish vocabulary, with dynamically generated verb conjugations.",
   "type": "module",
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test --test-timeout=45000 tests/*.test.mjs",
