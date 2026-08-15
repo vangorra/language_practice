@@ -156,10 +156,35 @@ function renderStatsBar(stats) {
   statsEl.appendChild(total);
 }
 
+// Distinct vibration feedback per outcome, roughly mirroring the
+// short-tap-for-yes / firmer-double-buzz-for-no convention phone haptics
+// generally use. Feature-detected: iOS Safari has never implemented the
+// Vibration API at all, and desktop browsers have no vibration motor, so
+// this silently does nothing there instead of throwing.
+const VIBRATE_PATTERNS = {
+  correct: 35, // one short, light tick
+  wrong: [40, 70, 40], // a firmer double-buzz, clearly distinct from a single tick
+};
+
+function vibrateFor(flash) {
+  if (!('vibrate' in navigator)) return;
+  const pattern = VIBRATE_PATTERNS[flash];
+  if (pattern) navigator.vibrate(pattern);
+}
+
+// Only fire on the render where `flash` newly becomes truthy -- it stays
+// 'correct'/'wrong' across the whole flash/fade duration (and, for a
+// mismatch, for as long as the player leaves it up), but should only buzz
+// once per outcome, not once per re-render.
+let lastFlash = null;
+
 function renderPractice(snapshot) {
   renderColumn(enColumnEl, snapshot.en, 'en', snapshot.flash, (side, id) => game.selectCard(side, id));
   renderColumn(esColumnEl, snapshot.es, 'es', snapshot.flash, (side, id) => game.selectCard(side, id));
   renderStatsBar(snapshot.stats);
+
+  if (snapshot.flash && snapshot.flash !== lastFlash) vibrateFor(snapshot.flash);
+  lastFlash = snapshot.flash;
 }
 
 // ---------------------------------------------------------------------------
@@ -481,7 +506,20 @@ for (const btn of tabButtons) {
 // Bootstrap
 // ---------------------------------------------------------------------------
 
+// Registered here rather than blocking on it: what actually makes the app
+// installable ("Add to Home Screen" -> a real standalone app, not just a
+// bookmark) on Chrome/Android, which requires a controlling service worker
+// with a fetch handler in addition to the manifest link in index.html. See
+// sw.js for what it caches and why.
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((err) => console.warn('Service worker registration failed', err));
+  });
+}
+
 async function main() {
+  registerServiceWorker();
   game = await createGame({ poolSize: Number(poolSizeSelect.value), onChange: renderPractice });
   renderPractice(game.snapshot());
 
