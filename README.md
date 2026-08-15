@@ -1,5 +1,7 @@
 # Spanish Vocab Matcher
 
+**Play it live: https://vangorra.github.io/language_practice/**
+
 A matching game for building Spanish vocabulary. English words sit in the
 left column, Spanish words in the right column; tap a word in each column
 to try to pair them up. Correct pairs are replaced with new words drawn
@@ -67,11 +69,12 @@ Then visit the printed URL. Works well on a phone browser too — the
 layout is responsive, long-press works with touch, matches/mismatches
 vibrate, and it's installable (see "Installing it as an app" above).
 
-**Live version**: pushes to this repo's branch build and deploy
-automatically to GitHub Pages (see `.github/workflows/deploy.yml`). If
-you fork this, GitHub Pages needs to be turned on once, by a repo admin,
-at *Settings → Pages → Source: GitHub Actions* — that one checkbox can't
-be flipped from a workflow file or from here.
+**Live version**: https://vangorra.github.io/language_practice/ — pushes
+to `main` build and deploy there automatically (see
+`.github/workflows/deploy.yml`). If you fork this, GitHub Pages needs to
+be turned on once, by a repo admin, at *Settings → Pages → Source:
+GitHub Actions* — that one checkbox can't be flipped from a workflow
+file or from here.
 
 Progress is saved to **IndexedDB** in your browser (one record per word,
 not one giant blob — see "Why IndexedDB" below), so it persists across
@@ -127,6 +130,15 @@ verb/tense/person combinations against the same engine — useful when
 debugging a particular form, separate from the collision tests above.
 
 ## How the scheduling works
+
+A pair has to be matched correctly **twice** in the same appearance
+before it actually counts as reviewed and gets replaced — the first
+correct match just flashes green and reappears unchanged. This is
+mostly about making a lucky or brute-forced guess (trying pairs until
+one sticks) much less rewarding, since it has to land twice in a row to
+get credit; anyone who actually knows the word just clicks it correctly
+one more time. Any wrong attempts in between still count toward that
+appearance's miss total (see below) either way.
 
 Each word tracks a small SM-2-style state: an ease factor, a review
 interval, and a due date. It's the same family of algorithm apps like
