@@ -1,5 +1,7 @@
 # Spanish Vocab Matcher
 
+**Play it live: https://vangorra.github.io/language_practice/**
+
 A matching game for building Spanish vocabulary. English words sit in the
 left column, Spanish words in the right column; tap a word in each column
 to try to pair them up. Correct pairs are replaced with new words drawn
@@ -67,11 +69,12 @@ Then visit the printed URL. Works well on a phone browser too — the
 layout is responsive, long-press works with touch, matches/mismatches
 vibrate, and it's installable (see "Installing it as an app" above).
 
-**Live version**: pushes to this repo's branch build and deploy
-automatically to GitHub Pages (see `.github/workflows/deploy.yml`). If
-you fork this, GitHub Pages needs to be turned on once, by a repo admin,
-at *Settings → Pages → Source: GitHub Actions* — that one checkbox can't
-be flipped from a workflow file or from here.
+**Live version**: https://vangorra.github.io/language_practice/ — pushes
+to `main` build and deploy there automatically (see
+`.github/workflows/deploy.yml`). If you fork this, GitHub Pages needs to
+be turned on once, by a repo admin, at *Settings → Pages → Source:
+GitHub Actions* — that one checkbox can't be flipped from a workflow
+file or from here.
 
 Progress is saved to **IndexedDB** in your browser (one record per word,
 not one giant blob — see "Why IndexedDB" below), so it persists across
