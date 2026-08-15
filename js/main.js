@@ -67,6 +67,22 @@ function cardClass(card, flash) {
   return classes.join(' ');
 }
 
+// renderColumn (below) fully rebuilds a column's DOM on *every* render --
+// including ones triggered by something totally unrelated to whichever
+// card the player currently has a finger/mouse down on, e.g. a match
+// resolving elsewhere. If a long-press timer is still pending when that
+// happens, the button it's attached to gets removed from the document
+// before pointerup/pointerleave ever gets a chance to fire on it, so
+// clearTimer() never runs -- the stale timer still fires ~500ms later,
+// against an already-detached button, for whatever card the player did a
+// perfectly normal quick tap on. That's what pops the card menu open
+// "for the word that was last pressed" with no long press involved, and
+// (separately -- see the .card-menu[hidden] CSS fix) leaves it stuck
+// empty on screen afterward. Tracked here so any render can cancel
+// whatever single press is currently pending, for whichever card it
+// belongs to, before tearing down its button.
+let cancelPendingLongPress = () => {};
+
 /** Wires up press-and-hold detection on a card button; calls onLongPress(wordId) once the hold clears the threshold. */
 function attachLongPress(btn, wordId, onLongPress) {
   let timer = null;
@@ -79,6 +95,7 @@ function attachLongPress(btn, wordId, onLongPress) {
       clearTimeout(timer);
       timer = null;
     }
+    if (cancelPendingLongPress === clearTimer) cancelPendingLongPress = () => {};
   };
 
   btn.addEventListener('pointerdown', (e) => {
@@ -87,10 +104,12 @@ function attachLongPress(btn, wordId, onLongPress) {
     startY = e.clientY;
     fired = false;
     clearTimer();
+    cancelPendingLongPress(); // only one press is ever in flight in a single-pointer UI
     timer = setTimeout(() => {
       fired = true;
       onLongPress(wordId, btn);
     }, LONG_PRESS_MS);
+    cancelPendingLongPress = clearTimer;
   });
   btn.addEventListener('pointermove', (e) => {
     if (!timer) return;
@@ -113,6 +132,7 @@ function attachLongPress(btn, wordId, onLongPress) {
 }
 
 function renderColumn(container, cards, side, flash, onPick) {
+  cancelPendingLongPress(); // about to tear down this column's buttons -- see its declaration for why
   container.innerHTML = '';
   for (const card of cards) {
     const text = side === 'en' ? card.word.en : card.word.es;

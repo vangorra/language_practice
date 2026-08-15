@@ -528,6 +528,17 @@ body {
   gap: 0.15rem;
 }
 
+/* The [hidden] attribute selector's specificity beats a bare .card-menu
+   selector (one class + one attribute vs. one class), so this correctly
+   overrides the display: flex above -- without it, the browser's default
+   [hidden] { display: none } UA-stylesheet rule loses to our own
+   .card-menu { display: flex }, and setting .hidden = true in JS (see
+   closeCardMenu in main.js) has *no visual effect at all*: the menu stays
+   on screen, just empty, wherever it was last positioned. */
+.card-menu[hidden] {
+  display: none;
+}
+
 .card-menu-title {
   padding: 0.4rem 0.6rem 0.5rem;
   font-size: 0.8rem;
