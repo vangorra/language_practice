@@ -51,7 +51,6 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
   let esColumn = [];
   let selectedEnId = null;
   let selectedEsId = null;
-  let lockInput = false; // brief lock during flash animations
 
   function expandVerbIfNeeded(word) {
     if (!isVerbInfinitive(word) || expandedVerbEs.has(word.es)) return;
@@ -119,15 +118,18 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     return counts;
   }
 
-  // Unlike a correct match (which clears the selection itself once it moves
-  // into the fade-out phase, see attemptMatch), a wrong pairing is left
-  // selected on purpose: both ids stay set with a non-equal pair for as
-  // long as the player leaves it there, so the red flash persists until
-  // their *next* selection clears it (see selectCard) rather than reverting
-  // on a fixed timer.
+  // A correct match clears the selection immediately (see attemptMatch) so
+  // the player can start their next pick right away rather than being
+  // blocked until the fade/replace animation finishes -- its green flash is
+  // driven by the `matched` flag on the specific cards instead (see
+  // cardClass in main.js). So by the time both ids are non-null here, they
+  // can only be a wrong pair: left selected on purpose, both ids staying
+  // set for as long as the player leaves them there, so the red flash
+  // persists until their *next* selection clears it (see selectCard)
+  // rather than reverting on a fixed timer.
   function currentFlash() {
     if (selectedEnId == null || selectedEsId == null) return null;
-    return selectedEnId === selectedEsId ? 'correct' : 'wrong';
+    return 'wrong';
   }
 
   function snapshot() {
@@ -135,7 +137,6 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     return {
       en: enColumn.map((c) => ({ ...c, word: wordsById.get(c.wordId), selected: c.wordId === selectedEnId })),
       es: esColumn.map((c) => ({ ...c, word: wordsById.get(c.wordId), selected: c.wordId === selectedEsId })),
-      locked: lockInput,
       flash,
       stats: { total: allWords.length, counts: tierCounts() },
     };
@@ -147,8 +148,6 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
 
   /** @param {'en'|'es'} side */
   function selectCard(side, wordId) {
-    if (lockInput) return;
-
     // A wrong pair stays on screen in red (see currentFlash) until the
     // player's next selection anywhere -- that click's first job is to
     // clear it back to normal, *then* register itself as a fresh, single
@@ -187,12 +186,22 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     const esId = selectedEsId;
 
     if (enId === esId) {
-      // Correct match: green flash, then fade the two matched cards out in
-      // place, then swap in a replacement (fading it in) at those exact
-      // same board positions. Every other card's index never changes, so
-      // it never has to shift to fill a gap -- see resolveMatch below.
-      lockInput = true;
-      emit(); // shows the "correct" flash (currentFlash) immediately
+      // Correct match: mark the two cards `matched` (green flash, via
+      // cardClass in main.js) and clear the selection immediately -- unlike
+      // a wrong pair, there's nothing left for the player to act on here,
+      // so nothing should be left occupying selectedEnId/selectedEsId and
+      // blocking their next pick while the fade/replace animation plays
+      // out. Then: fade the two matched cards out in place, then swap in a
+      // replacement (fading it in) at those exact same board positions.
+      // Every other card's index never changes, so it never has to shift
+      // to fill a gap -- see resolveMatch below.
+      const enCard = enColumn.find((c) => c.wordId === enId);
+      const esCard = esColumn.find((c) => c.wordId === esId);
+      if (enCard) enCard.matched = true;
+      if (esCard) esCard.matched = true;
+      selectedEnId = null;
+      selectedEsId = null;
+      emit();
       setTimeout(() => resolveMatch(enId, esId), MATCH_FLASH_MS);
       return;
     }
@@ -219,10 +228,14 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     putWordState(enId, states[enId]).catch((err) => console.warn('Failed to save word state', err));
     recordHistory(bucketFromMisses(misses), wasNewWord);
 
-    if (enCard) enCard.removing = true;
-    if (esCard) esCard.removing = true;
-    selectedEnId = null;
-    selectedEsId = null;
+    if (enCard) {
+      delete enCard.matched;
+      enCard.removing = true;
+    }
+    if (esCard) {
+      delete esCard.matched;
+      esCard.removing = true;
+    }
     emit();
 
     setTimeout(() => swapInReplacement(enId, esId), REMOVE_FADE_MS);
@@ -245,7 +258,6 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
       expandVerbIfNeeded(nextWord);
     }
 
-    lockInput = false;
     emit();
 
     if (nextWord) setTimeout(() => clearEntering(nextWord.id), ENTER_FADE_MS);

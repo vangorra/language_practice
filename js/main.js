@@ -50,15 +50,18 @@ let game; // assigned once createGame() resolves, in main()
 
 function cardClass(card, flash) {
   const classes = ['card'];
-  // A card mid-match-resolution (see game.js resolveMatch/swapInReplacement)
-  // takes priority over the normal selected/flash styling: it's already
-  // been deselected by that point, and is instead fading out (still
-  // showing the match it just won) or fading in as its replacement.
+  // A card mid-match-resolution (see game.js attemptMatch/resolveMatch/
+  // swapInReplacement) takes priority over the normal selected/flash
+  // styling: `matched` is the brief green flash right after a correct
+  // match (the selection is already cleared by that point, on purpose —
+  // see game.js — so this can't be driven by `selected`+flash like the
+  // wrong-match red still is), then it's fading out, then fading in as
+  // its replacement.
   if (card.removing) classes.push('card-removing');
   else if (card.entering) classes.push('card-entering');
+  else if (card.matched) classes.push('correct');
   else if (card.selected) {
-    if (flash === 'correct') classes.push('correct');
-    else if (flash === 'wrong') classes.push('wrong');
+    if (flash === 'wrong') classes.push('wrong');
     else classes.push('selected');
   }
   return classes.join(' ');
@@ -172,19 +175,32 @@ function vibrateFor(flash) {
   if (pattern) navigator.vibrate(pattern);
 }
 
-// Only fire on the render where `flash` newly becomes truthy -- it stays
-// 'correct'/'wrong' across the whole flash/fade duration (and, for a
-// mismatch, for as long as the player leaves it up), but should only buzz
-// once per outcome, not once per re-render.
+// Wrong: only fire on the render where `flash` newly becomes 'wrong' -- it
+// stays that way for as long as the player leaves the mismatch up, but
+// should only buzz once per outcome, not once per re-render.
 let lastFlash = null;
+
+// Correct: can't key off `flash` the same way (game.js clears the
+// selection immediately on a match, precisely so a second match can start
+// resolving concurrently -- see its comments), so instead diff the *set*
+// of currently-`matched` word ids against last render's set and fire once
+// per id that's newly in it. That, rather than a single "did anything just
+// match" boolean, is what keeps two matches thrown in quick succession
+// (each still gets its own brief `matched` window) from being coalesced
+// into a single buzz.
+let lastMatchedIds = new Set();
 
 function renderPractice(snapshot) {
   renderColumn(enColumnEl, snapshot.en, 'en', snapshot.flash, (side, id) => game.selectCard(side, id));
   renderColumn(esColumnEl, snapshot.es, 'es', snapshot.flash, (side, id) => game.selectCard(side, id));
   renderStatsBar(snapshot.stats);
 
-  if (snapshot.flash && snapshot.flash !== lastFlash) vibrateFor(snapshot.flash);
+  if (snapshot.flash === 'wrong' && snapshot.flash !== lastFlash) vibrateFor('wrong');
   lastFlash = snapshot.flash;
+
+  const matchedIds = new Set(snapshot.en.filter((c) => c.matched).map((c) => c.wordId));
+  if ([...matchedIds].some((id) => !lastMatchedIds.has(id))) vibrateFor('correct');
+  lastMatchedIds = matchedIds;
 }
 
 // ---------------------------------------------------------------------------
