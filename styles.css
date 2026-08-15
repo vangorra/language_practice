@@ -190,9 +190,15 @@ body {
   background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 }
 
+/* A confirmed match: green and locked (see selectCard in game.js -- it
+   can't be selected or deselected anymore), staying this way until a
+   second pair is also confirmed and both clear together. Not
+   pointer-events: none, though -- that would also block the long-press
+   menu, which should still work on it (e.g. marking it known). */
 .card.correct {
   border-color: var(--correct);
   background: color-mix(in srgb, var(--correct) 20%, var(--surface));
+  cursor: default;
 }
 
 .card.wrong {
