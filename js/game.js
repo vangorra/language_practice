@@ -8,6 +8,14 @@ const MATCH_FLASH_MS = 350; // green highlight, before the fade-out starts
 const REMOVE_FADE_MS = 220; // fade-out duration for a just-matched card
 const ENTER_FADE_MS = 250; // fade-in duration for the card that replaces it
 const HISTORY_CHART_DAYS = 30;
+// A pair has to be matched correctly this many times, in the same
+// appearance, before it's actually removed and replaced. Without this, a
+// lucky or brute-forced single correct click was enough to get full credit
+// and clear a pair -- requiring a second correct match makes that far less
+// exploitable (a genuine guess has to land twice), while a player who
+// actually knows the word just clicks it correctly one extra time. See
+// attemptMatch/resolveMatch.
+const MATCHES_NEEDED = 2;
 
 /** @param {number} misses */
 function bucketFromMisses(misses) {
@@ -45,9 +53,9 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
   const expandedVerbEs = new Set();
   const { expandVerb } = createConjugationExpander(usedIds);
 
-  /** @type {{wordId:string, misses:number}[]} */
+  /** @type {{wordId:string, misses:number, matchCount?:number}[]} */
   let enColumn = [];
-  /** @type {{wordId:string, misses:number}[]} */
+  /** @type {{wordId:string, misses:number, matchCount?:number}[]} */
   let esColumn = [];
   let selectedEnId = null;
   let selectedEsId = null;
@@ -190,19 +198,31 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
       // cardClass in main.js) and clear the selection immediately -- unlike
       // a wrong pair, there's nothing left for the player to act on here,
       // so nothing should be left occupying selectedEnId/selectedEsId and
-      // blocking their next pick while the fade/replace animation plays
-      // out. Then: fade the two matched cards out in place, then swap in a
-      // replacement (fading it in) at those exact same board positions.
-      // Every other card's index never changes, so it never has to shift
-      // to fill a gap -- see resolveMatch below.
+      // blocking their next pick while the flash/fade animation plays out.
       const enCard = enColumn.find((c) => c.wordId === enId);
       const esCard = esColumn.find((c) => c.wordId === esId);
+      const matchCount = (enCard?.matchCount ?? 0) + 1;
+      if (enCard) enCard.matchCount = matchCount;
+      if (esCard) esCard.matchCount = matchCount;
       if (enCard) enCard.matched = true;
       if (esCard) esCard.matched = true;
       selectedEnId = null;
       selectedEsId = null;
       emit();
-      setTimeout(() => resolveMatch(enId, esId), MATCH_FLASH_MS);
+
+      if (matchCount < MATCHES_NEEDED) {
+        // Not the final match yet: flash green same as always, then just
+        // revert back to a normal, still-on-screen card (see
+        // clearPartialMatch) -- the player has to find and match it again
+        // before it actually counts.
+        setTimeout(() => clearPartialMatch(enId, esId), MATCH_FLASH_MS);
+      } else {
+        // Final match: fade the two matched cards out in place, then swap
+        // in a replacement (fading it in) at those exact same board
+        // positions. Every other card's index never changes, so it never
+        // has to shift to fill a gap -- see resolveMatch below.
+        setTimeout(() => resolveMatch(enId, esId), MATCH_FLASH_MS);
+      }
       return;
     }
 
@@ -217,7 +237,16 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     emit();
   }
 
-  /** Phase 2 of a correct match: record the review, then start the fade-out. */
+  /** A correct match that isn't the final one yet (see MATCHES_NEEDED): just drop the green flash and stay on screen, unchanged, for the player to find and match again. */
+  function clearPartialMatch(enId, esId) {
+    const enCard = enColumn.find((c) => c.wordId === enId);
+    const esCard = esColumn.find((c) => c.wordId === esId);
+    if (enCard) delete enCard.matched;
+    if (esCard) delete esCard.matched;
+    emit();
+  }
+
+  /** Phase 2 of the *final* correct match: record the review, then start the fade-out. */
   function resolveMatch(enId, esId) {
     const enCard = enColumn.find((c) => c.wordId === enId);
     const esCard = esColumn.find((c) => c.wordId === esId);

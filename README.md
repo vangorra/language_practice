@@ -131,6 +131,15 @@ debugging a particular form, separate from the collision tests above.
 
 ## How the scheduling works
 
+A pair has to be matched correctly **twice** in the same appearance
+before it actually counts as reviewed and gets replaced — the first
+correct match just flashes green and reappears unchanged. This is
+mostly about making a lucky or brute-forced guess (trying pairs until
+one sticks) much less rewarding, since it has to land twice in a row to
+get credit; anyone who actually knows the word just clicks it correctly
+one more time. Any wrong attempts in between still count toward that
+appearance's miss total (see below) either way.
+
 Each word tracks a small SM-2-style state: an ease factor, a review
 interval, and a due date. It's the same family of algorithm apps like
 Anki use, adapted so a "review" happens automatically whenever the word
