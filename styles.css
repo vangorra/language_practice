@@ -102,15 +102,30 @@ body {
 .card {
   display: flex;
   flex-direction: column;
+  justify-content: center; /* centers the card-main+context block when context is absent */
   gap: 0.2rem;
   font-family: inherit;
   padding: 0.85rem 1rem;
+  /* Fixed height (min AND max, not just a minimum) so every card is the
+     same size regardless of content -- a short word, a long phrase, and an
+     English card with a context subheading all match. Sized to fit
+     card-main's own fixed 3-line height (see below) plus room for context's
+     own 2-line clamp (see .card-context) -- context isn't otherwise
+     height-reserved, since it's only ever present on some English cards,
+     never on the Spanish side (see main.js), and ~10% of context strings
+     genuinely run to 2 lines even at desktop width, not just as an edge
+     case. overflow: hidden is the safety net for the rare longer one.
+     Re-computed for the mobile breakpoint below, since padding/font-sizes
+     change there too. */
+  min-height: 7.6rem;
+  max-height: 7.6rem;
+  overflow: hidden;
   border-radius: 0.6rem;
   border: 1.5px solid var(--border);
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
-  text-align: left;
+  text-align: center;
   transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
   /* Long-press-friendly: no text-selection callout or native context menu flicker on hold. */
   touch-action: manipulation;
@@ -122,15 +137,21 @@ body {
 .card-main {
   font-size: 1rem;
   line-height: 1.3;
-  /* Reserve 2 lines' worth of height (2 x line-height) regardless of
-     whether this particular card's text needs it, so a short single-word
-     card and a long-phrase card are the same height instead of the list
-     looking jagged -- and so a card swapping to a longer/shorter word on
-     match doesn't change height. In em units so it scales automatically
-     with the smaller font-size .long-text and the mobile breakpoint use. */
-  min-height: 2.6em;
+  /* Fixed at exactly 3 lines' worth of height (3 x line-height) -- both
+     min- and max-height, not just a minimum -- regardless of whether this
+     particular card's text needs it, so a short single-word card and a
+     long-phrase card are always the same height instead of the list
+     looking jagged, and so a card swapping to a longer/shorter word on
+     match never changes height either. In em units so it scales
+     automatically with the smaller font-size .long-text and the mobile
+     breakpoint use. The rare phrase that would wrap past 3 lines gets
+     clipped (overflow: hidden) rather than growing the card.  */
+  min-height: 3.9em;
+  max-height: 3.9em;
+  overflow: hidden;
   display: flex;
-  align-items: center;
+  align-items: center; /* vertical centering within the fixed height */
+  justify-content: center; /* horizontal centering (text-align, above, handles wrapped lines) */
 }
 
 .card.long-text .card-main {
@@ -142,6 +163,18 @@ body {
   font-weight: 400;
   line-height: 1.25;
   color: var(--muted);
+  /* .card's fixed total height (see above) leaves room for about one line
+     of context -- fine for most, but a few genuinely run to 2-3 lines
+     (e.g. the "derecho"/"derecha" disambiguation). Clamping to 2 lines
+     with an ellipsis degrades those gracefully instead of the card's
+     overflow: hidden clipping mid-sentence with no visual indicator. Not
+     needed on .card-main: its own longest real entries are comfortably
+     short, and it's already a flex box for centering, which -webkit-box
+     (required for line-clamp) can't be combined with on the same element. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .card:hover {
@@ -560,6 +593,10 @@ body {
 
   .card {
     padding: 0.6rem 0.6rem;
+    /* Re-derived for this breakpoint's smaller padding/font-sizes -- see
+       the base .card rule's comment for how this is computed. */
+    min-height: 6.35rem;
+    max-height: 6.35rem;
   }
 
   .card-main {
