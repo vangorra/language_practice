@@ -42,25 +42,28 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Stale-while-revalidate: serve instantly from cache when we have it (so a
-// repeat visit, online or off, never blocks on the network), while always
-// refreshing the cache in the background so the next visit picks up
-// whatever changed.
+// Network-first, falling back to cache only when the network fails
+// (offline). This app is under active, fast-moving development, and this
+// used to be stale-while-revalidate (serve cache instantly, refresh it in
+// the background) -- which sounds harmless but meant "I pushed a fix" and
+// "your browser is actually running it" could be a build or two apart:
+// every visit kept serving whatever was cached from a previous visit, no
+// matter how many new versions had shipped since, until some later reload
+// happened to catch a warm cache. Network-first fixes that -- a normal
+// online visit always gets this build's actual files, and the cache still
+// only exists so the shell keeps working if you happen to open it offline.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
