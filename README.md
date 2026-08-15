@@ -196,6 +196,7 @@ js/slugify.js             Shared id-from-Spanish-text scheme (static AND dynamic
 js/dynamic-conjugator.js  Generates verb conjugations at runtime (see "How conjugations work")
 js/srs.js                 Pure scheduling logic (SM-2 variant, "mark known", pool selection)
 js/history.js             Pure streak/chart-data helpers over the daily review log
+js/format.js              Pure display-formatting helpers for the Word List table
 js/db.js                  IndexedDB persistence (per-word states + daily history)
 js/game.js                Game state machine (pool, selection, match handling, verb expansion)
 js/main.js                DOM wiring / rendering (tabs, table, chart, long-press menu)
@@ -205,19 +206,42 @@ scripts/validate_conjugations.mjs  Spot-checks a verb/tense/person against the c
 tests/srs.test.mjs                 Unit tests for the scheduler
 tests/history.test.mjs             Unit tests for streak/chart-data helpers
 tests/dynamic-conjugator.test.mjs  Unit tests for runtime conjugation + collision handling
+tests/format.test.mjs              Unit tests for the Word List's display-formatting helpers
+tests/slugify.test.mjs             Unit tests for the shared id-from-Spanish-text scheme
+tests/words.test.mjs               Unit tests for the vocabulary list's shape + duplicate-id check
+tests/db.test.mjs                  Unit tests for IndexedDB persistence (incl. in-memory fallback)
+tests/game.test.mjs                Unit tests for the game state machine
+tests/main.test.mjs                DOM-driven integration tests for main.js (via jsdom)
+.c8rc.json                         Coverage tool config + enforced thresholds (see "Tests")
 .github/workflows/deploy.yml       Build + deploy dist/ to GitHub Pages on push
 ```
 
 ## Tests
 
 ```sh
-npm test
+npm test              # run the full suite
+npm run test:coverage # run it with coverage, enforcing the thresholds below
 ```
 
-runs `node --test` over `tests/srs.test.mjs`, `tests/history.test.mjs`,
-and `tests/dynamic-conjugator.test.mjs` (no build needed — these import
-the source files directly, and `@jirimracek/conjugate-esp` resolves fine
-under plain Node since it's a real `node_modules` dependency).
+`npm test` runs `node --test` over every file in `tests/` (no build
+needed — these import the source files directly, and
+`@jirimracek/conjugate-esp` resolves fine under plain Node since it's a
+real `node_modules` dependency). `tests/db.test.mjs` and
+`tests/game.test.mjs` use `fake-indexeddb` to exercise real IndexedDB
+semantics without a browser; `tests/main.test.mjs` uses `jsdom` to drive
+the actual `index.html` DOM.
+
+`npm run test:coverage` wraps the same run in [c8](https://github.com/bcoe/c8)
+and enforces a **98% minimum across branches, lines, statements, and
+functions** (see `.c8rc.json`) — CI runs this, not plain `npm test`, so a
+coverage regression fails the build. `js/words-imported.js` (auto-generated
+data, no logic of its own) is excluded from the count; everything else
+under `js/` is measured. A handful of individual branches are annotated
+`/* c8 ignore */` with a comment explaining why — each one is either
+provably unreachable (e.g. a code path only possible once the *entire*
+~29,000-entry deck, including every verb conjugation, is simultaneously
+active) or a defensive guard against an invariant nothing in the codebase
+can currently violate.
 
 ## Credits
 

@@ -100,6 +100,23 @@ test('totals reports null accuracy when there are no reviews yet', () => {
   assert.equal(totals({}).accuracy, null);
 });
 
+test('totals defaults missing per-day fields to 0 instead of NaN', () => {
+  // A record missing some fields (e.g. from an older schema) shouldn't
+  // poison the running totals.
+  const t = totals({ '2026-01-01': { reviews: 2 } });
+  assert.equal(t.reviews, 2);
+  assert.equal(t.clean, 0);
+  assert.equal(t.retried, 0);
+  assert.equal(t.lapsed, 0);
+  assert.equal(t.newWords, 0);
+});
+
+test('totals defaults a missing reviews field to 0 too', () => {
+  const t = totals({ '2026-01-01': { clean: 1 } });
+  assert.equal(t.reviews, 0);
+  assert.equal(t.clean, 1);
+});
+
 test('addReviewToRecord accumulates without mutating the input', () => {
   const day1 = addReviewToRecord(undefined, 'clean', true);
   assert.deepEqual(day1, { reviews: 1, clean: 1, retried: 0, lapsed: 0, newWords: 1 });

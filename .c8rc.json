@@ -1,0 +1,10 @@
+{
+  "all": true,
+  "include": ["js/**/*.js"],
+  "exclude": ["tests/**", "js/words-imported.js"],
+  "reporter": ["text", "html"],
+  "branches": 98,
+  "lines": 98,
+  "statements": 98,
+  "functions": 98
+}

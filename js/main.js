@@ -1,5 +1,6 @@
 import { createGame } from './game.js';
 import { TIER } from './srs.js';
+import { formatInterval, formatRelative, formatAccuracy } from './format.js';
 
 const enColumnEl = document.getElementById('en-column');
 const esColumnEl = document.getElementById('es-column');
@@ -121,11 +122,17 @@ function attachLongPress(btn, wordId, onLongPress) {
   btn.addEventListener('contextmenu', (e) => e.preventDefault());
   // A long press still ends in a click (both mouse and touch fire one on
   // release) — swallow just that one so it doesn't also register as a
-  // normal tap-to-select.
+  // normal tap-to-select. stopImmediatePropagation (not just
+  // stopPropagation) is required here: the other 'click' listener that
+  // does the actual select lives on this *same* button (see renderColumn),
+  // and stopPropagation alone doesn't stop a sibling listener on the same
+  // element from firing — only listeners registered afterward on the same
+  // target are affected, which is also why this call is wired up *before*
+  // renderColumn attaches its own click listener.
   btn.addEventListener('click', (e) => {
     if (fired) {
       e.preventDefault();
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       fired = false;
     }
   });
@@ -159,8 +166,10 @@ function renderColumn(container, cards, side, flash, onPick) {
       btn.appendChild(sub);
     }
 
-    btn.addEventListener('click', () => onPick(side, card.wordId));
+    // attachLongPress must be wired up first -- see its own click listener
+    // for why the ordering matters.
     attachLongPress(btn, card.wordId, openCardMenu);
+    btn.addEventListener('click', () => onPick(side, card.wordId));
     container.appendChild(btn);
   }
 }
@@ -244,7 +253,14 @@ function openCardMenu(wordId, anchorEl) {
   closeCardMenu();
   const word = game.getWordById(wordId);
   const status = game.getWordStatus(wordId);
+  /* c8 ignore start -- wordId always comes from a card actually on screen
+     (see renderColumn/attachLongPress), and game.js never deletes a word
+     or its state once created (only resets it), so this can't currently
+     go null in practice. Left in as a defensive guard against a future
+     change to that invariant, e.g. game.js ever spawning cards for words
+     outside the loaded catalog. */
   if (!word || !status) return;
+  /* c8 ignore stop */
 
   cardMenuEl.innerHTML = '';
   const title = document.createElement('div');
@@ -322,32 +338,6 @@ let page = 0;
 
 const TEXT_SORT_KEYS = new Set(['en', 'es', 'category', 'tier']);
 
-function formatInterval(intervalMin) {
-  if (!intervalMin) return '—';
-  if (intervalMin < 60) return `${Math.round(intervalMin)}m`;
-  if (intervalMin < 24 * 60) return `${Math.round(intervalMin / 60)}h`;
-  return `${Math.round(intervalMin / (24 * 60))}d`;
-}
-
-function formatRelative(ts, { future }) {
-  if (ts == null) return future ? '—' : 'never';
-  const diffMs = future ? ts - Date.now() : Date.now() - ts;
-  if (future && diffMs <= 0) return 'due now';
-  if (!future && diffMs < 60_000) return 'just now';
-  const minutes = Math.round(diffMs / 60_000);
-  const hours = Math.round(diffMs / 3_600_000);
-  const days = Math.round(diffMs / 86_400_000);
-  let amount;
-  if (minutes < 60) amount = `${minutes}m`;
-  else if (hours < 24) amount = `${hours}h`;
-  else amount = `${days}d`;
-  return future ? `in ${amount}` : `${amount} ago`;
-}
-
-function formatAccuracy(accuracy) {
-  return accuracy == null ? '—' : `${Math.round(accuracy * 100)}%`;
-}
-
 function refreshWordList() {
   wordListCache = game.getAllWordsWithStats();
   renderWordTable();
@@ -393,7 +383,9 @@ function renderWordTable() {
       w.en,
       w.es,
       w.category,
-      TIER_LABELS[w.tier] ?? w.tier,
+      // srs.js's tierOf() only ever returns one of TIER's four values, all
+      // of which TIER_LABELS covers -- no fallback needed.
+      TIER_LABELS[w.tier],
       String(w.timesSeen),
       formatAccuracy(w.accuracy),
       formatInterval(w.intervalMin),

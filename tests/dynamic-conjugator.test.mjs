@@ -86,6 +86,79 @@ test('a verb the engine cannot conjugate (multi-word "infinitive") returns no en
   assert.deepEqual(entries, []);
 });
 
+test('a verb whose conjugation genuinely throws is handled without crashing', async () => {
+  // The real engine is defensive internally and never actually throws for
+  // any input we've found (even garbage input just comes back as an
+  // "Unknown verb" result, caught by the Array.isArray check below the try
+  // block) -- so expandVerb's try/catch is tested here by making the engine
+  // throw directly, restoring it immediately after regardless of outcome.
+  const { Conjugator } = await import('@jirimracek/conjugate-esp');
+  const original = Conjugator.prototype.conjugateSync;
+  Conjugator.prototype.conjugateSync = () => {
+    throw new Error('simulated engine failure');
+  };
+  try {
+    const { expandVerb } = createConjugationExpander(new Set());
+    const entries = expandVerb({ es: 'hablar', en: 'to speak' });
+    assert.deepEqual(entries, []);
+  } finally {
+    Conjugator.prototype.conjugateSync = original;
+  }
+});
+
+test('regular English present-tense 3rd person spelling rules (sibilant +es, consonant+y -> +ies)', () => {
+  const besar = createConjugationExpander(new Set()).expandVerb({ es: 'besar', en: 'to kiss' });
+  const besarElla = besar.find((e) => e.context.includes('· él/ella ·') && e.context.includes('present'));
+  assert.equal(besarElla.en, 'he/she kisses');
+
+  const intentar = createConjugationExpander(new Set()).expandVerb({ es: 'intentar', en: 'to try' });
+  const intentarElla = intentar.find((e) => e.context.includes('· él/ella ·') && e.context.includes('present'));
+  assert.equal(intentarElla.en, 'he/she tries');
+});
+
+test('a genuinely defective verb (every entry marked defective) falls back to the first result', () => {
+  // "soler" has no non-defective entry at all -- entry.find(...) returns
+  // undefined for every candidate, exercising the `|| result[0]` fallback.
+  const { expandVerb } = createConjugationExpander(new Set());
+  const entries = expandVerb({ es: 'soler', en: 'to usually' });
+  const yoPresent = entries.find((e) => e.context.includes('· yo ·') && e.context.includes('present'));
+  assert.equal(yoPresent.es, 'suelo');
+});
+
+test('a tense missing entirely, too short, or missing one person is skipped defensively', async () => {
+  // The real engine always returns full 6-element arrays (using "-" as a
+  // placeholder for truly defective forms), so these shapes never occur in
+  // practice -- exercised here directly, the same way the "genuinely
+  // throws" test above exercises its try/catch.
+  const { Conjugator } = await import('@jirimracek/conjugate-esp');
+  const original = Conjugator.prototype.conjugateSync;
+  Conjugator.prototype.conjugateSync = () => [
+    {
+      info: { defective: false },
+      conjugation: {
+        Indicativo: {
+          Presente: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'],
+          PreteritoIndefinido: undefined, // whole tense missing -> `!forms`
+          PreteritoImperfecto: ['x', 'y', 'z'], // too short -> `forms.length < 6`
+          FuturoImperfecto: [undefined, 'f2', 'f3', 'f4', 'f5', 'f6'], // one missing person -> `!es`
+          CondicionalSimple: ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'],
+        },
+      },
+    },
+  ];
+  try {
+    const { expandVerb } = createConjugationExpander(new Set());
+    const entries = expandVerb({ es: 'fakeverb', en: 'to fake' });
+    assert.ok(!entries.some((e) => e.context.includes('preterite')), 'missing tense produced no entries');
+    assert.ok(!entries.some((e) => e.context.includes('imperfect')), 'too-short tense produced no entries');
+    const future = entries.filter((e) => e.context.includes('· future'));
+    assert.equal(future.length, 4, 'one of the 5 future persons (yo) was skipped for a missing form');
+    assert.ok(!future.some((e) => e.context.includes('· yo ·')), 'the missing person (yo) was skipped');
+  } finally {
+    Conjugator.prototype.conjugateSync = original;
+  }
+});
+
 test('irregular English present tense (to be, to have, to go) is handled', () => {
   const { expandVerb } = createConjugationExpander(new Set());
   const ser = createConjugationExpander(new Set()).expandVerb({ es: 'ser', en: 'to be' });

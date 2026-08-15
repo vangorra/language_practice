@@ -2188,20 +2188,29 @@ const RAW_WORDS = [
   { en: 'myth', es: 'el mito', category: 'concepts' },
 ];
 
+/**
+ * Fail fast if two entries collide on their derived id (i.e. share the same
+ * `es` text) — that would make them unpairable. Exported (rather than an
+ * inline loop) so it's directly testable against a small synthetic list,
+ * without needing to corrupt the real ~2000-entry vocabulary to exercise
+ * the throw branch.
+ */
+export function assertNoDuplicateIds(words) {
+  const seen = new Map();
+  for (const w of words) {
+    if (seen.has(w.id)) {
+      throw new Error(
+        `Duplicate Spanish text produces the same id "${w.id}": "${seen.get(w.id)}" and "${w.es}"`
+      );
+    }
+    seen.set(w.id, w.es);
+  }
+}
+
 export const WORDS = [...RAW_WORDS, ...RAW_IMPORTED_WORDS].map((w) => ({
   type: 'word',
   ...w,
   id: slugify(w.es),
 }));
 
-// Fail fast in development if two entries collide on their derived id
-// (i.e. share the same `es` text) — that would make them unpairable.
-const seen = new Map();
-for (const w of WORDS) {
-  if (seen.has(w.id)) {
-    throw new Error(
-      `Duplicate Spanish text produces the same id "${w.id}": "${seen.get(w.id)}" and "${w.es}"`
-    );
-  }
-  seen.set(w.id, w.es);
-}
+assertNoDuplicateIds(WORDS);

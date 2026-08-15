@@ -143,8 +143,17 @@ export function reviewWord(state, misses, now = Date.now()) {
   return s;
 }
 
-/** Weighted random pick: items is an array, weights is a same-length array of positive numbers. */
-function weightedPick(items, weights, rng = Math.random) {
+/**
+ * Weighted random pick: items is an array, weights is a same-length array of
+ * positive numbers. Exported (only pickNextWord below calls it in practice)
+ * so its two defensive fallbacks -- a non-positive weight total, and the
+ * loop finishing without picking anything -- can be exercised directly:
+ * neither is reachable through pickNextWord's real call site, since its
+ * weights are always `Math.max(1, ...)` (so never <= 0 in total) and rng is
+ * always Math.random (which never returns >= 1, the only way the loop could
+ * finish without an item's cumulative weight bringing r to <= 0).
+ */
+export function weightedPick(items, weights, rng = Math.random) {
   const total = weights.reduce((a, b) => a + b, 0);
   if (total <= 0) return items[Math.floor(rng() * items.length)];
   let r = rng() * total;
@@ -209,26 +218,35 @@ export function pickNextWord(allWords, states, activeIds, options = {}) {
   }
 
   if (masteredNotDue.length > 0 && rng() < masteryCheckChance) {
-    masteredNotDue.sort((a, b) => (states[a.id].lastSeenAt ?? 0) - (states[b.id].lastSeenAt ?? 0));
+    // lastSeenAt is unconditionally set by every path that can reach
+    // TIER.MASTERED (markKnown and reviewWord both stamp it), so no `?? 0`
+    // fallback is needed here.
+    masteredNotDue.sort((a, b) => states[a.id].lastSeenAt - states[b.id].lastSeenAt);
     return masteredNotDue[0];
   }
 
-  if (canIntroduceNew) {
-    return brandNew[Math.floor(rng() * brandNew.length)];
-  }
-
+  // No due words at this point (the due.length > 0 branch above always
+  // returns), so canIntroduceNew here would already have been true and
+  // returned above too -- this is the "cap reached, but nothing else is
+  // available either" fallback: introduce a new word anyway rather than
+  // stall, ignoring the cap just this once.
   if (brandNew.length > 0) {
     return brandNew[Math.floor(rng() * brandNew.length)];
   }
 
   if (masteredNotDue.length > 0) {
-    masteredNotDue.sort((a, b) => (states[a.id].lastSeenAt ?? 0) - (states[b.id].lastSeenAt ?? 0));
+    masteredNotDue.sort((a, b) => states[a.id].lastSeenAt - states[b.id].lastSeenAt);
     return masteredNotDue[0];
   }
 
-  // Fallback: nothing due, nothing new — just pick the least-recently-seen candidate.
+  // Fallback: nothing due, nothing new, nothing mastered-not-due -- just
+  // pick the least-recently-seen candidate. Reaching this point requires
+  // brandNew.length === 0 (the unconditional check above always returns
+  // otherwise), so every remaining candidate has timesSeen > 0 and
+  // therefore a real lastSeenAt (reviewWord and markKnown both stamp it
+  // unconditionally) -- no `?? 0` fallback needed.
   const sorted = [...candidates].sort(
-    (a, b) => (states[a.id].lastSeenAt ?? 0) - (states[b.id].lastSeenAt ?? 0)
+    (a, b) => states[a.id].lastSeenAt - states[b.id].lastSeenAt
   );
   return sorted[0];
 }
