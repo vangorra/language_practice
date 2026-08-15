@@ -8,13 +8,16 @@ const MATCH_FLASH_MS = 350; // green highlight, before the fade-out starts
 const REMOVE_FADE_MS = 220; // fade-out duration for a just-matched card
 const ENTER_FADE_MS = 250; // fade-in duration for the card that replaces it
 const HISTORY_CHART_DAYS = 30;
-// A pair has to be matched correctly this many times, in the same
-// appearance, before it's actually removed and replaced. Without this, a
-// lucky or brute-forced single correct click was enough to get full credit
-// and clear a pair -- requiring a second correct match makes that far less
-// exploitable (a genuine guess has to land twice), while a player who
-// actually knows the word just clicks it correctly one extra time. See
-// attemptMatch/resolveMatch.
+// A correct match doesn't clear right away -- it turns green and *locks*
+// (see selectCard: a matched card can't be selected or deselected anymore)
+// while play continues elsewhere, and stays that way until this many
+// distinct pairs are confirmed. Only then do all of them fade out and get
+// replaced together. Without this, a lucky or brute-forced guess (or just
+// spamming one already-known pair) got full credit the instant it landed;
+// now the player has to move on and confirm a *different* pair too before
+// anything actually clears, which is much less exploitable while still
+// costing a knowledgeable player nothing but one extra correct match. See
+// attemptMatch/resolveMatches.
 const MATCHES_NEEDED = 2;
 
 /** @param {number} misses */
@@ -53,12 +56,14 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
   const expandedVerbEs = new Set();
   const { expandVerb } = createConjugationExpander(usedIds);
 
-  /** @type {{wordId:string, misses:number, matchCount?:number}[]} */
+  /** @type {{wordId:string, misses:number, matched?:boolean}[]} */
   let enColumn = [];
-  /** @type {{wordId:string, misses:number, matchCount?:number}[]} */
+  /** @type {{wordId:string, misses:number, matched?:boolean}[]} */
   let esColumn = [];
   let selectedEnId = null;
   let selectedEsId = null;
+  /** Correct pairs confirmed (green, locked) but not yet cleared -- see MATCHES_NEEDED. @type {{enId:string, esId:string, misses:number}[]} */
+  let pendingConfirmed = [];
 
   function expandVerbIfNeeded(word) {
     if (!isVerbInfinitive(word) || expandedVerbEs.has(word.es)) return;
@@ -156,6 +161,12 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
 
   /** @param {'en'|'es'} side */
   function selectCard(side, wordId) {
+    // A confirmed (green) card is locked -- done, waiting for a second
+    // pair to also be confirmed before anything clears (see
+    // MATCHES_NEEDED) -- so it can't be selected *or* deselected anymore.
+    const card = (side === 'en' ? enColumn : esColumn).find((c) => c.wordId === wordId);
+    if (card?.matched) return;
+
     // A wrong pair stays on screen in red (see currentFlash) until the
     // player's next selection anywhere -- that click's first job is to
     // clear it back to normal, *then* register itself as a fresh, single
@@ -194,34 +205,29 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     const esId = selectedEsId;
 
     if (enId === esId) {
-      // Correct match: mark the two cards `matched` (green flash, via
-      // cardClass in main.js) and clear the selection immediately -- unlike
-      // a wrong pair, there's nothing left for the player to act on here,
-      // so nothing should be left occupying selectedEnId/selectedEsId and
-      // blocking their next pick while the flash/fade animation plays out.
+      // Correct match: mark the two cards `matched` (green, and now locked
+      // -- see selectCard) and clear the selection immediately -- unlike a
+      // wrong pair, there's nothing left for the player to act on here, so
+      // nothing should be left occupying selectedEnId/selectedEsId and
+      // blocking their next pick while this pair waits. Queue it in
+      // pendingConfirmed rather than resolving it right away: nothing
+      // actually clears until MATCHES_NEEDED distinct pairs are confirmed
+      // (see the constant's comment for why), however long that takes --
+      // this one just sits there green until then.
       const enCard = enColumn.find((c) => c.wordId === enId);
       const esCard = esColumn.find((c) => c.wordId === esId);
-      const matchCount = (enCard?.matchCount ?? 0) + 1;
-      if (enCard) enCard.matchCount = matchCount;
-      if (esCard) esCard.matchCount = matchCount;
+      const misses = Math.max(enCard?.misses ?? 0, esCard?.misses ?? 0);
       if (enCard) enCard.matched = true;
       if (esCard) esCard.matched = true;
       selectedEnId = null;
       selectedEsId = null;
+      pendingConfirmed.push({ enId, esId, misses });
       emit();
 
-      if (matchCount < MATCHES_NEEDED) {
-        // Not the final match yet: flash green same as always, then just
-        // revert back to a normal, still-on-screen card (see
-        // clearPartialMatch) -- the player has to find and match it again
-        // before it actually counts.
-        setTimeout(() => clearPartialMatch(enId, esId), MATCH_FLASH_MS);
-      } else {
-        // Final match: fade the two matched cards out in place, then swap
-        // in a replacement (fading it in) at those exact same board
-        // positions. Every other card's index never changes, so it never
-        // has to shift to fill a gap -- see resolveMatch below.
-        setTimeout(() => resolveMatch(enId, esId), MATCH_FLASH_MS);
+      if (pendingConfirmed.length >= MATCHES_NEEDED) {
+        const batch = pendingConfirmed;
+        pendingConfirmed = [];
+        setTimeout(() => resolveMatches(batch), MATCH_FLASH_MS);
       }
       return;
     }
@@ -237,59 +243,58 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     emit();
   }
 
-  /** A correct match that isn't the final one yet (see MATCHES_NEEDED): just drop the green flash and stay on screen, unchanged, for the player to find and match again. */
-  function clearPartialMatch(enId, esId) {
-    const enCard = enColumn.find((c) => c.wordId === enId);
-    const esCard = esColumn.find((c) => c.wordId === esId);
-    if (enCard) delete enCard.matched;
-    if (esCard) delete esCard.matched;
+  /** Once MATCHES_NEEDED pairs are confirmed: record each one's review, then start fading all of them out together. */
+  function resolveMatches(batch) {
+    for (const { enId, esId, misses } of batch) {
+      const wasNewWord = states[enId].timesSeen === 0;
+      states[enId] = reviewWord(states[enId], misses);
+      putWordState(enId, states[enId]).catch((err) => console.warn('Failed to save word state', err));
+      recordHistory(bucketFromMisses(misses), wasNewWord);
+
+      const enCard = enColumn.find((c) => c.wordId === enId);
+      const esCard = esColumn.find((c) => c.wordId === esId);
+      if (enCard) {
+        delete enCard.matched;
+        enCard.removing = true;
+      }
+      if (esCard) {
+        delete esCard.matched;
+        esCard.removing = true;
+      }
+    }
     emit();
+
+    setTimeout(() => swapInReplacements(batch), REMOVE_FADE_MS);
   }
 
-  /** Phase 2 of the *final* correct match: record the review, then start the fade-out. */
-  function resolveMatch(enId, esId) {
-    const enCard = enColumn.find((c) => c.wordId === enId);
-    const esCard = esColumn.find((c) => c.wordId === esId);
-    const misses = Math.max(enCard?.misses ?? 0, esCard?.misses ?? 0);
-    const wasNewWord = states[enId].timesSeen === 0;
+  /** Swap every faded-out slot in the batch for a freshly picked word, in place, and let each fade in. */
+  function swapInReplacements(batch) {
+    const entered = [];
+    for (const { enId, esId } of batch) {
+      const enIdx = enColumn.findIndex((c) => c.wordId === enId);
+      const esIdx = esColumn.findIndex((c) => c.wordId === esId);
+      // activeIdsExcluding reads the live columns, so words already swapped
+      // in earlier iterations of this same batch correctly count as taken.
+      const nextWord = pickNextWord(allWords, states, activeIdsExcluding(enId));
 
-    states[enId] = reviewWord(states[enId], misses);
-    putWordState(enId, states[enId]).catch((err) => console.warn('Failed to save word state', err));
-    recordHistory(bucketFromMisses(misses), wasNewWord);
-
-    if (enCard) {
-      delete enCard.matched;
-      enCard.removing = true;
-    }
-    if (esCard) {
-      delete esCard.matched;
-      esCard.removing = true;
-    }
-    emit();
-
-    setTimeout(() => swapInReplacement(enId, esId), REMOVE_FADE_MS);
-  }
-
-  /** Phase 3: swap the faded-out slot for a freshly picked word, in place, and let it fade in. */
-  function swapInReplacement(enId, esId) {
-    const enIdx = enColumn.findIndex((c) => c.wordId === enId);
-    const esIdx = esColumn.findIndex((c) => c.wordId === esId);
-    const nextWord = pickNextWord(allWords, states, activeIdsExcluding(enId));
-
-    if (enIdx === -1 || esIdx === -1 || !nextWord) {
-      // Nothing to replace it with (deck exhausted) -- fall back to just
-      // shrinking the pool by this one slot.
-      if (enIdx !== -1) enColumn.splice(enIdx, 1);
-      if (esIdx !== -1) esColumn.splice(esIdx, 1);
-    } else {
-      enColumn[enIdx] = { wordId: nextWord.id, misses: 0, entering: true };
-      esColumn[esIdx] = { wordId: nextWord.id, misses: 0, entering: true };
-      expandVerbIfNeeded(nextWord);
+      if (enIdx === -1 || esIdx === -1 || !nextWord) {
+        // Nothing to replace it with (deck exhausted) -- fall back to just
+        // shrinking the pool by this one slot.
+        if (enIdx !== -1) enColumn.splice(enIdx, 1);
+        if (esIdx !== -1) esColumn.splice(esIdx, 1);
+      } else {
+        enColumn[enIdx] = { wordId: nextWord.id, misses: 0, entering: true };
+        esColumn[esIdx] = { wordId: nextWord.id, misses: 0, entering: true };
+        expandVerbIfNeeded(nextWord);
+        entered.push(nextWord.id);
+      }
     }
 
     emit();
 
-    if (nextWord) setTimeout(() => clearEntering(nextWord.id), ENTER_FADE_MS);
+    for (const wordId of entered) {
+      setTimeout(() => clearEntering(wordId), ENTER_FADE_MS);
+    }
   }
 
   /** Phase 4: drop the transient "entering" flag once its fade-in has played, so an unrelated re-render later doesn't replay it. */
@@ -330,6 +335,12 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     }
     if (selectedEnId === wordId) selectedEnId = null;
     if (selectedEsId === wordId) selectedEsId = null;
+    // If this word was sitting confirmed-but-pending (green, waiting on a
+    // second pair -- see MATCHES_NEEDED), drop it from the queue too: it's
+    // about to be removed outright via a completely different path (the
+    // long-press menu, not a match), so there's nothing left to resolve it
+    // against.
+    pendingConfirmed = pendingConfirmed.filter((p) => p.enId !== wordId);
     removeWord(wordId);
     fillPool();
     emit();
@@ -394,6 +405,7 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     esColumn = [];
     selectedEnId = null;
     selectedEsId = null;
+    pendingConfirmed = [];
     fillPool();
     emit();
   }

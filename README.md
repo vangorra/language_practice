@@ -131,14 +131,16 @@ debugging a particular form, separate from the collision tests above.
 
 ## How the scheduling works
 
-A pair has to be matched correctly **twice** in the same appearance
-before it actually counts as reviewed and gets replaced — the first
-correct match just flashes green and reappears unchanged. This is
-mostly about making a lucky or brute-forced guess (trying pairs until
-one sticks) much less rewarding, since it has to land twice in a row to
-get credit; anyone who actually knows the word just clicks it correctly
-one more time. Any wrong attempts in between still count toward that
-appearance's miss total (see below) either way.
+A correct match doesn't clear right away — it turns green and **locks**
+(you can't select or deselect it anymore) while you keep playing, and
+stays that way until a **second, different** pair is also confirmed —
+then both clear and get replaced together. This is mostly about making
+a lucky or brute-forced guess (or just spamming one pair you already
+know) much less rewarding: a single correct click no longer gets
+instant, full credit, and you can't just keep re-matching the same easy
+pair for "wins" once it's locked — you have to move on to something
+else. Any wrong attempts along the way still count toward that
+appearance's miss total (see below) regardless.
 
 Each word tracks a small SM-2-style state: an ease factor, a review
 interval, and a due date. It's the same family of algorithm apps like
