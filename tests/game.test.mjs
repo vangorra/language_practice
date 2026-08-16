@@ -383,6 +383,75 @@ test('getWordById returns the full word object for a known id', async () => {
   assert.ok(word.en && word.es);
 });
 
+test('getLevelProgress starts at the frontier level A1, with nothing yet introduced', async () => {
+  const game = await createGame({ poolSize: 4 });
+  const progress = game.getLevelProgress();
+  assert.equal(progress.currentLevel, 'A1');
+  assert.ok(progress.byLevel.A1.total > 0);
+  assert.equal(progress.byLevel.A1.introduced, 0);
+  assert.equal(progress.byLevel.C2.total > 0, true, 'every level should have at least some words');
+});
+
+test('getLevelProgress counts a confirmed review as introducing that word\'s level', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const game = await createGame({ poolSize: 6 });
+  const [idA, idB] = game.snapshot().en.map((c) => c.wordId);
+  const levelA = game.getWordById(idA).level;
+  const levelB = game.getWordById(idB).level;
+
+  const before = game.getLevelProgress();
+  selectCorrectPair(game, idA);
+  selectCorrectPair(game, idB);
+  t.mock.timers.tick(MATCH_FLASH_MS + REMOVE_FADE_MS + ENTER_FADE_MS);
+
+  const after = game.getLevelProgress();
+  // idA and idB might land on the same level (both count toward it) or
+  // different ones (one each) -- either way, the total introduced across
+  // all levels goes up by exactly 2 (one per reviewed word).
+  const sumIntroduced = (p) => Object.values(p.byLevel).reduce((n, l) => n + l.introduced, 0);
+  assert.equal(sumIntroduced(after), sumIntroduced(before) + 2);
+  assert.ok(after.byLevel[levelA].introduced > before.byLevel[levelA].introduced);
+  assert.ok(after.byLevel[levelB].introduced > before.byLevel[levelB].introduced);
+});
+
+test('getLevelProgress advances the frontier level once the lower level is fully introduced', async () => {
+  // Seed every A1 word (and, for A1 verb infinitives, their present-tense
+  // conjugations too -- those are themselves fresh A1-level vocabulary the
+  // moment the infinitive is "introduced", via the same catch-up pass
+  // createGame runs) as already-introduced before the game even loads, so
+  // the frontier should move on to A2 for this session.
+  const a1Words = WORDS.filter((w) => w.level === 'A1');
+  const usedIds = new Set(WORDS.map((w) => w.id));
+  const { expandVerb } = createConjugationExpander(usedIds);
+  const seedState = {
+    timesSeen: 1,
+    timesCorrect: 1,
+    timesWrong: 0,
+    ef: 2.5,
+    intervalMin: 1440,
+    reps: 1,
+    lapses: 0,
+    learningStep: 2,
+    dueAt: Date.now() + 86_400_000,
+    lastSeenAt: Date.now(),
+    manuallyMastered: false,
+  };
+
+  for (const w of a1Words) {
+    await putWordState(w.id, seedState);
+    if (w.category === 'verbs' && w.type === 'word') {
+      for (const conjugated of expandVerb(w)) {
+        if (conjugated.level === 'A1') await putWordState(conjugated.id, seedState);
+      }
+    }
+  }
+
+  const game = await createGame({ poolSize: 4 });
+  const progress = game.getLevelProgress();
+  assert.equal(progress.currentLevel, 'A2');
+  assert.equal(progress.byLevel.A1.introduced, progress.byLevel.A1.total);
+});
+
 test('getHistorySummary reflects a completed review', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const game = await createGame({ poolSize: 6 });

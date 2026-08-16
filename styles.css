@@ -75,6 +75,37 @@ body {
 .stat-mastered { border-color: var(--mastered); color: var(--mastered); }
 .stat-total { font-weight: 600; color: var(--text); }
 
+.level-progress {
+  max-width: 320px;
+  margin: -0.75rem auto 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.level-progress-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.level-progress-track {
+  display: block;
+  width: 100%;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.level-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
 .board {
   max-width: 760px;
   margin: 0 auto;

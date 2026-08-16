@@ -2,6 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createConjugationExpander } from '../js/dynamic-conjugator.js';
 
+test("a conjugated form's level is the max of its verb's level and its tense's level", () => {
+  const { expandVerb } = createConjugationExpander(new Set());
+  const entries = expandVerb({ es: 'hablar', en: 'to speak', level: 'A1' });
+
+  const present = entries.find((e) => e.context.includes('present tense'));
+  assert.equal(present.level, 'A1', 'present tense floors at A1 regardless of the verb');
+
+  const conditional = entries.find((e) => e.context.includes('conditional'));
+  assert.equal(conditional.level, 'B2', "conditional's B2 outranks even an A1 verb");
+});
+
+test("a conjugated form's level never drops below its own (more advanced) verb's level", () => {
+  const { expandVerb } = createConjugationExpander(new Set());
+  const entries = expandVerb({ es: 'hablar', en: 'to speak', level: 'C1' });
+  const present = entries.find((e) => e.context.includes('present tense'));
+  assert.equal(present.level, 'C1', "the verb's own C1 outranks present tense's A1 floor");
+});
+
 test('expands a regular verb into cards for all 5 simple indicative tenses', () => {
   const { expandVerb } = createConjugationExpander(new Set());
   const entries = expandVerb({ es: 'hablar', en: 'to speak' });

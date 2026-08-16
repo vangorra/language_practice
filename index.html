@@ -32,6 +32,7 @@
 
   <main id="panel-practice" class="panel">
     <section id="stats" class="stats-bar" aria-label="Progress summary"></section>
+    <section id="level-progress" class="level-progress" aria-label="Current CEFR level"></section>
 
     <div class="board">
       <div class="column" aria-label="English words">
@@ -69,6 +70,15 @@
         <option value="familiar">Familiar</option>
         <option value="mastered">Mastered</option>
       </select>
+      <select id="level-filter" aria-label="Filter by CEFR level">
+        <option value="all">All levels</option>
+        <option value="A1">A1</option>
+        <option value="A2">A2</option>
+        <option value="B1">B1</option>
+        <option value="B2">B2</option>
+        <option value="C1">C1</option>
+        <option value="C2">C2</option>
+      </select>
       <label class="checkbox-label">
         <input id="seen-only" type="checkbox" checked />
         Only words I've practiced
@@ -81,6 +91,7 @@
             <th data-sort="en">English</th>
             <th data-sort="es">Español</th>
             <th data-sort="category">Category</th>
+            <th data-sort="level">Level</th>
             <th data-sort="tier">Tier</th>
             <th data-sort="timesSeen">Seen</th>
             <th data-sort="accuracy">Accuracy</th>

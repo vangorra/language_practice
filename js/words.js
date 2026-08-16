@@ -1,5 +1,6 @@
 import { RAW_IMPORTED_WORDS } from './words-imported.js';
 import { slugify } from './slugify.js';
+import { levelForPosition } from './level.js';
 
 // Vocabulary list: single words and short common phrases (verb
 // conjugations are NOT declared here -- js/dynamic-conjugator.js generates
@@ -2207,8 +2208,16 @@ export function assertNoDuplicateIds(words) {
   }
 }
 
-export const WORDS = [...RAW_WORDS, ...RAW_IMPORTED_WORDS].map((w) => ({
+// Level (see js/level.js) is assigned by position in this combined list --
+// RAW_WORDS is hand-curated for common/basic coverage first (greetings,
+// numbers, pronouns, core verbs all land in its early sections), so it
+// naturally fills out the lower levels; RAW_IMPORTED_WORDS continues the
+// same ladder in frequency order. An entry can still set its own `level`
+// explicitly (spread after the computed default below) to override this
+// for a specific word that position alone gets wrong.
+export const WORDS = [...RAW_WORDS, ...RAW_IMPORTED_WORDS].map((w, i) => ({
   type: 'word',
+  level: levelForPosition(i),
   ...w,
   id: slugify(w.es),
 }));

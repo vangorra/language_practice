@@ -14,6 +14,8 @@
 // there's no explicit self-rating, since the matching game itself supplies
 // the signal.
 
+import { levelRank } from './level.js';
+
 export const MINUTE = 60 * 1000;
 export const DAY = 24 * 60 * MINUTE;
 
@@ -165,13 +167,31 @@ export function weightedPick(items, weights, rng = Math.random) {
 }
 
 /**
+ * Among candidate brand-new words, narrow to just the lowest CEFR level
+ * present -- a soft version of how a real course sequences vocabulary:
+ * don't hand out B1 words while there are still unintroduced A1 ones,
+ * without hard-blocking anything (review of already-active due words is
+ * completely unaffected, and once a level's brand-new words run out this
+ * naturally advances to the next one -- no separate "mastery" gate to get
+ * stuck behind).
+ */
+function lowestLevelAmong(words) {
+  let lowest = words[0].level;
+  for (const w of words) {
+    if (levelRank(w.level) < levelRank(lowest)) lowest = w.level;
+  }
+  return words.filter((w) => w.level === lowest);
+}
+
+/**
  * Choose the next word to bring into the active pool.
  *
  * Priority, roughly:
  *   1. Words that are due for review (weighted toward "most overdue"),
  *      which covers both "struggling" words (short intervals, due again
  *      soon) and ordinary spaced review.
- *   2. New, never-seen words, trickled in a couple at a time.
+ *   2. New, never-seen words, trickled in a couple at a time, lowest
+ *      CEFR level first (see lowestLevelAmong).
  *   3. Occasional early "mastery check" on a well-known word that isn't
  *      technically due yet, just to confirm it's still solid.
  *   4. A least-recently-seen fallback so the game never stalls.
@@ -209,7 +229,8 @@ export function pickNextWord(allWords, states, activeIds, options = {}) {
   const canIntroduceNew = brandNew.length > 0 && activeNewCount < newWordCap;
 
   if (canIntroduceNew && (due.length === 0 || rng() < newWordChance)) {
-    return brandNew[Math.floor(rng() * brandNew.length)];
+    const lowest = lowestLevelAmong(brandNew);
+    return lowest[Math.floor(rng() * lowest.length)];
   }
 
   if (due.length > 0) {
@@ -231,7 +252,8 @@ export function pickNextWord(allWords, states, activeIds, options = {}) {
   // available either" fallback: introduce a new word anyway rather than
   // stall, ignoring the cap just this once.
   if (brandNew.length > 0) {
-    return brandNew[Math.floor(rng() * brandNew.length)];
+    const lowest = lowestLevelAmong(brandNew);
+    return lowest[Math.floor(rng() * lowest.length)];
   }
 
   if (masteredNotDue.length > 0) {

@@ -5,6 +5,7 @@ import { formatInterval, formatRelative, formatAccuracy } from './format.js';
 const enColumnEl = document.getElementById('en-column');
 const esColumnEl = document.getElementById('es-column');
 const statsEl = document.getElementById('stats');
+const levelProgressEl = document.getElementById('level-progress');
 const resetBtn = document.getElementById('reset-btn');
 const poolSizeSelect = document.getElementById('pool-size');
 
@@ -17,6 +18,7 @@ const panels = {
 
 const wordSearchEl = document.getElementById('word-search');
 const tierFilterEl = document.getElementById('tier-filter');
+const levelFilterEl = document.getElementById('level-filter');
 const seenOnlyEl = document.getElementById('seen-only');
 const wordTableBody = document.getElementById('word-table-body');
 const pageInfoEl = document.getElementById('page-info');
@@ -188,6 +190,35 @@ function renderStatsBar(stats) {
   statsEl.appendChild(total);
 }
 
+/**
+ * Small indicator for the CEFR "frontier" level (see game.js's
+ * getLevelProgress) -- new words are introduced lowest-level-first, so
+ * this is roughly "what stage the player is currently working through",
+ * not a strict measure of overall mastery.
+ */
+function renderLevelProgress() {
+  const { currentLevel, byLevel } = game.getLevelProgress();
+  const { total, introduced } = byLevel[currentLevel];
+  /* c8 ignore start -- every CEFR level in the current deck has hundreds
+     of words (see tests/words.test.mjs's distribution check), so `total`
+     is never actually 0; kept as a guard against divide-by-zero should
+     the deck ever shrink enough that a level is empty. */
+  const pct = total === 0 ? 0 : Math.round((introduced / total) * 100);
+  /* c8 ignore stop */
+
+  levelProgressEl.innerHTML = '';
+  const label = document.createElement('span');
+  label.className = 'level-progress-label';
+  label.textContent = `Level ${currentLevel} · ${introduced}/${total} words introduced`;
+  const track = document.createElement('span');
+  track.className = 'level-progress-track';
+  const fill = document.createElement('span');
+  fill.className = 'level-progress-fill';
+  fill.style.width = `${pct}%`;
+  track.appendChild(fill);
+  levelProgressEl.append(label, track);
+}
+
 // Distinct vibration feedback per outcome, roughly mirroring the
 // short-tap-for-yes / firmer-double-buzz-for-no convention phone haptics
 // generally use. Feature-detected: iOS Safari has never implemented the
@@ -223,6 +254,7 @@ function renderPractice(snapshot) {
   renderColumn(enColumnEl, snapshot.en, 'en', snapshot.flash, (side, id) => game.selectCard(side, id));
   renderColumn(esColumnEl, snapshot.es, 'es', snapshot.flash, (side, id) => game.selectCard(side, id));
   renderStatsBar(snapshot.stats);
+  renderLevelProgress();
 
   if (snapshot.flash === 'wrong' && snapshot.flash !== lastFlash) vibrateFor('wrong');
   lastFlash = snapshot.flash;
@@ -336,7 +368,7 @@ let sortKey = 'lastSeenAt';
 let sortDir = 'desc';
 let page = 0;
 
-const TEXT_SORT_KEYS = new Set(['en', 'es', 'category', 'tier']);
+const TEXT_SORT_KEYS = new Set(['en', 'es', 'category', 'level', 'tier']);
 
 function refreshWordList() {
   wordListCache = game.getAllWordsWithStats();
@@ -346,11 +378,13 @@ function refreshWordList() {
 function getFilteredSortedWords() {
   const search = wordSearchEl.value.trim().toLowerCase();
   const tier = tierFilterEl.value;
+  const level = levelFilterEl.value;
   const seenOnly = seenOnlyEl.checked;
 
   let rows = wordListCache;
   if (seenOnly) rows = rows.filter((w) => w.timesSeen > 0);
   if (tier !== 'all') rows = rows.filter((w) => w.tier === tier);
+  if (level !== 'all') rows = rows.filter((w) => w.level === level);
   if (search) {
     rows = rows.filter(
       (w) => w.en.toLowerCase().includes(search) || w.es.toLowerCase().includes(search)
@@ -383,6 +417,7 @@ function renderWordTable() {
       w.en,
       w.es,
       w.category,
+      w.level,
       // srs.js's tierOf() only ever returns one of TIER's four values, all
       // of which TIER_LABELS covers -- no fallback needed.
       TIER_LABELS[w.tier],
@@ -443,6 +478,10 @@ wordSearchEl.addEventListener('input', () => {
   renderWordTable();
 });
 tierFilterEl.addEventListener('change', () => {
+  page = 0;
+  renderWordTable();
+});
+levelFilterEl.addEventListener('change', () => {
   page = 0;
   renderWordTable();
 });

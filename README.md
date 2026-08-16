@@ -168,6 +168,47 @@ bar and the Word List table, are a display bucketing of each word's
 current interval (or the manual "known" override) — there's no separate
 scoring system underneath.
 
+## How leveling works
+
+Every word (and every conjugated form) is tagged with a
+[CEFR level](https://en.wikipedia.org/wiki/Common_European_Framework_of_Reference_for_Languages)
+(A1 → C2) — the standard scale language courses and exams use to
+describe "what stage this vocabulary/grammar belongs to." New words are
+introduced lowest-level-first: the game won't hand you a B1 word while
+there are still un-introduced A1 words around, the same way a real
+course sequences its units.
+
+**Assigning the level.** The canonical word-by-word CEFR inventory for
+Spanish (Instituto Cervantes' *Plan Curricular*) is copyrighted reference
+material, not something to embed here. Instead, `js/level.js` derives a
+level from a word's position in the deck, using published
+cumulative-vocabulary-size benchmarks per level (A1 ≈ 500 words, A2 ≈
+900-1,000 cumulative, B1 ≈ 1,850-2,000 cumulative — B2/C1/C2 extrapolate
+the same growth pattern past that). `js/words.js`'s `RAW_WORDS` is
+hand-curated for common/basic coverage first (greetings, numbers,
+pronouns, and core verbs all land in its early sections), so it
+naturally fills out the lower levels; the frequency-ranked
+`RAW_IMPORTED_WORDS` continues the same ladder afterward. This is an
+*approximation* — good enough to sequence a learning game, not a
+substitute for a certified curriculum — and any entry can still set its
+own `level` explicitly to override the computed default.
+
+**Leveling grammar, not just vocabulary.** A conjugated form's level is
+the *more advanced* of its verb's own level and its tense's level (see
+`js/dynamic-conjugator.js`) — present tense floors at A1, preterite at
+A2, imperfect/future at B1, conditional at B2, matching the order Spanish
+courses typically introduce these. So even a common A1 verb's
+*conditional* form is still gated at B2: knowing an infinitive doesn't
+mean every one of its conjugations is introduced at once.
+
+**Soft, not hard, gating.** This only affects which *new* word gets
+introduced next (see `pickNextWord` in `js/srs.js`) — it never blocks
+reviewing an already-active or due word regardless of level, and once a
+level's new words run out, the next level opens up automatically. The
+Practice tab shows a small progress indicator for the current level
+(`game.js`'s `getLevelProgress()`), and the Word List table has a Level
+column and filter alongside the existing Tier one.
+
 ## Why IndexedDB
 
 The word list runs into the thousands (more once conjugations are
@@ -195,6 +236,7 @@ js/words-imported.js      Auto-generated frequency-sourced vocabulary (see scrip
 js/slugify.js             Shared id-from-Spanish-text scheme (static AND dynamic entries)
 js/dynamic-conjugator.js  Generates verb conjugations at runtime (see "How conjugations work")
 js/srs.js                 Pure scheduling logic (SM-2 variant, "mark known", pool selection)
+js/level.js               Pure CEFR level helpers (see "How leveling works")
 js/history.js             Pure streak/chart-data helpers over the daily review log
 js/format.js              Pure display-formatting helpers for the Word List table
 js/db.js                  IndexedDB persistence (per-word states + daily history)
@@ -204,6 +246,7 @@ scripts/build.mjs                  esbuild bundling -> dist/ (see "Running it")
 scripts/import_vocab.py            ETL: frequency data + Wiktionary glosses -> words-imported.js
 scripts/validate_conjugations.mjs  Spot-checks a verb/tense/person against the conjugation engine
 tests/srs.test.mjs                 Unit tests for the scheduler
+tests/level.test.mjs               Unit tests for the CEFR level helpers
 tests/history.test.mjs             Unit tests for streak/chart-data helpers
 tests/dynamic-conjugator.test.mjs  Unit tests for runtime conjugation + collision handling
 tests/format.test.mjs              Unit tests for the Word List's display-formatting helpers
