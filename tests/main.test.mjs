@@ -7,6 +7,8 @@ import { JSDOM } from 'jsdom';
 import 'fake-indexeddb/auto';
 import * as db from '../js/db.js';
 import { WORDS } from '../js/words.js';
+import { createConjugationExpander } from '../js/dynamic-conjugator.js';
+import { levelRank } from '../js/level.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HTML = readFileSync(path.join(__dirname, '../index.html'), 'utf8');
@@ -22,6 +24,43 @@ test.beforeEach(async () => {
 });
 
 let instanceCounter = 0;
+
+/**
+ * Seeds every word at or below `belowLevel` (exclusive) as already
+ * "introduced" directly in the db, before the game even loads -- so
+ * createGame's new-word scheduling (see srs.js's level-based
+ * prioritization) moves on to the next level right away, instead of
+ * requiring genuine play through hundreds of words first. Verb
+ * infinitives also get their present-tense conjugations seeded, since
+ * introducing a verb spawns those as fresh same-level vocabulary too (see
+ * the equivalent technique/comment in tests/game.test.mjs).
+ */
+async function seedLevelsBelow(belowLevel) {
+  const usedIds = new Set(WORDS.map((w) => w.id));
+  const { expandVerb } = createConjugationExpander(usedIds);
+  const seedState = {
+    timesSeen: 1,
+    timesCorrect: 1,
+    timesWrong: 0,
+    ef: 2.5,
+    intervalMin: 1440,
+    reps: 1,
+    lapses: 0,
+    learningStep: 2,
+    dueAt: Date.now() + 86_400_000,
+    lastSeenAt: Date.now(),
+    manuallyMastered: false,
+  };
+  for (const w of WORDS) {
+    if (levelRank(w.level) >= levelRank(belowLevel)) continue;
+    await db.putWordState(w.id, seedState);
+    if (w.category === 'verbs' && w.type === 'word') {
+      for (const conjugated of expandVerb(w)) {
+        if (levelRank(conjugated.level) < levelRank(belowLevel)) await db.putWordState(conjugated.id, seedState);
+      }
+    }
+  }
+}
 
 /**
  * Sets up a fresh jsdom document (the real index.html) as the global DOM,
@@ -99,16 +138,46 @@ test('renders the practice board with the default pool size and a populated stat
   assert.match(document.getElementById('stats').textContent, /Total: \d+/);
 });
 
-test('a long piece of text gets the long-text class', async () => {
+test('the level progress indicator starts at A1 with a 0% fill', async () => {
   await setupMain();
-  // Only ~0.3% of the vocabulary is long enough to trigger this, so a
-  // single small random pool isn't a reliable way to hit it -- grow the
-  // pool and re-roll it a handful of times instead, deterministically
-  // reaching a long-text card without needing the whole ~5800-word deck
-  // active at once (which, per game.js, is far too slow to construct).
+  const el = document.getElementById('level-progress');
+  assert.match(el.textContent, /^Level A1 · 0\/\d+ words introduced$/);
+  assert.equal(el.querySelector('.level-progress-fill').style.width, '0%');
+});
+
+test('the level progress indicator updates as words are introduced', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  await setupMain();
+  const enButtons = [...document.getElementById('en-column').children];
+  const wordA = wordForEnButton(enButtons[0]);
+  const wordB = wordForEnButton(enButtons[1]);
+  enButtons[0].click();
+  esButtonFor(wordA).click();
+  document.getElementById('en-column').children[1].click();
+  esButtonFor(wordB).click();
+  t.mock.timers.tick(MATCH_FLASH_MS + REMOVE_FADE_MS + ENTER_FADE_MS);
+
+  const el = document.getElementById('level-progress');
+  assert.doesNotMatch(el.textContent, /Level A1 · 0\//, 'at least one word should now be introduced');
+});
+
+test('a long piece of text gets the long-text class', async () => {
+  // No word long enough to trigger this lands below B1 (see js/level.js --
+  // it's all short, common A1/A2 vocabulary down there), and new words are
+  // now introduced lowest-level-first (see srs.js), so a fresh game would
+  // never surface one without playing through hundreds of words first --
+  // seed A1/A2 as already introduced so the pool draws from B1+ instead.
+  await seedLevelsBelow('B1');
+  await setupMain();
+  // Only a small fraction of the remaining vocabulary is long enough to
+  // trigger this, so a single small random pool isn't a reliable way to
+  // hit it -- grow the pool and re-roll it a handful of times instead,
+  // deterministically reaching a long-text card without needing the whole
+  // remaining deck active at once (which, per game.js, is far too slow to
+  // construct).
   const select = document.getElementById('pool-size');
-  select.add(new window.Option('60', '60'));
-  select.value = '60';
+  select.add(new window.Option('150', '150'));
+  select.value = '150';
   select.dispatchEvent(new window.Event('change'));
   await flush();
 
@@ -467,8 +536,36 @@ test('the tier filter narrows rows to the selected tier and resets to page 1', a
 
   const body = document.getElementById('word-table-body');
   for (const row of body.children) {
-    assert.equal(row.children[3].textContent, 'New');
+    assert.equal(row.children[4].textContent, 'New');
   }
+});
+
+test('the level filter narrows rows to the selected CEFR level and resets to page 1', async () => {
+  await setupMain();
+  document.querySelector('.tab-btn[data-tab="words"]').click();
+  document.getElementById('seen-only').checked = false;
+  document.getElementById('seen-only').dispatchEvent(new window.Event('change'));
+
+  document.getElementById('level-filter').value = 'A1';
+  document.getElementById('level-filter').dispatchEvent(new window.Event('change'));
+
+  const body = document.getElementById('word-table-body');
+  assert.ok(body.children.length > 0);
+  for (const row of body.children) {
+    assert.equal(row.children[3].textContent, 'A1');
+  }
+});
+
+test('the level column header sorts alphabetically (which matches CEFR order: A1 < A2 < ... < C2)', async () => {
+  await setupMain();
+  document.querySelector('.tab-btn[data-tab="words"]').click();
+  document.getElementById('seen-only').checked = false;
+  document.getElementById('seen-only').dispatchEvent(new window.Event('change'));
+
+  document.querySelector('#word-table th[data-sort="level"]').click();
+  const firstPageLevels = [...document.getElementById('word-table-body').children].map((r) => r.children[3].textContent);
+  assert.deepEqual(firstPageLevels, [...firstPageLevels].sort());
+  assert.equal(firstPageLevels[0], 'A1');
 });
 
 test('clicking a column header sorts by it (ascending first for text columns)', async () => {
@@ -511,11 +608,11 @@ test('rows with a null sort value (never-seen words\' lastSeenAt) sort to the bo
   const lastSeenHeader = document.querySelector('#word-table th[data-sort="lastSeenAt"]');
   lastSeenHeader.click(); // desc first (numeric default)
   const lastRowDesc = [...document.getElementById('word-table-body').children].at(-1);
-  assert.equal(lastRowDesc.children[8].textContent, 'never', 'never-seen words (null lastSeenAt) sort last even descending');
+  assert.equal(lastRowDesc.children[9].textContent, 'never', 'never-seen words (null lastSeenAt) sort last even descending');
 
   lastSeenHeader.click(); // asc
   const lastRowAsc = [...document.getElementById('word-table-body').children].at(-1);
-  assert.equal(lastRowAsc.children[8].textContent, 'never', 'and still last ascending');
+  assert.equal(lastRowAsc.children[9].textContent, 'never', 'and still last ascending');
 });
 
 test('pagination: next/prev buttons move pages and disable at the ends', async () => {

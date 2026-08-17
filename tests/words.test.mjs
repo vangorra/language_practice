@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WORDS, assertNoDuplicateIds } from '../js/words.js';
 import { slugify } from '../js/slugify.js';
+import { LEVELS } from '../js/level.js';
 
 test('WORDS is non-empty and every entry has the required shape', () => {
   assert.ok(WORDS.length > 100, 'expect a substantial vocabulary');
@@ -12,7 +13,23 @@ test('WORDS is non-empty and every entry has the required shape', () => {
     assert.equal(typeof w.es, 'string');
     assert.equal(typeof w.category, 'string');
     assert.ok(w.type === 'word' || w.type === 'phrase');
+    assert.ok(LEVELS.includes(w.level), `expected a valid CEFR level, got ${w.level}`);
   }
+});
+
+test('level is assigned by position, earlier words landing at easier levels', () => {
+  assert.equal(WORDS[0].level, 'A1');
+  assert.equal(WORDS.at(-1).level, 'C2');
+  // Non-decreasing overall: nothing at the midpoint of the deck should be
+  // *easier* than the very first entry.
+  const rank = (l) => LEVELS.indexOf(l);
+  assert.ok(rank(WORDS[0].level) <= rank(WORDS[Math.floor(WORDS.length / 2)].level));
+});
+
+test('a raw entry can override its computed level explicitly', () => {
+  const overridden = { en: 'x', es: 'unique-override-test-word', category: 'test', level: 'C1' };
+  const merged = { type: 'word', level: 'A1', ...overridden, id: slugify(overridden.es) };
+  assert.equal(merged.level, 'C1', 'the explicit level wins over the computed default');
 });
 
 test('each id is derived from its es text via slugify', () => {

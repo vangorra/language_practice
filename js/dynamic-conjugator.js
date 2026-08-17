@@ -16,18 +16,24 @@
 
 import { Conjugator } from '@jirimracek/conjugate-esp';
 import { slugify } from './slugify.js';
+import { maxLevel } from './level.js';
 
 const PERSON_INDEX = { yo: 0, 'tú': 1, 'él/ella': 2, nosotros: 3, ellos: 5 };
 
-// [conjugator tense key, mood, our tense label] -- all 5 simple indicative
-// tenses the engine exposes (IndicativoSubSimpleKey in its types), not a
-// hand-picked subset.
+// [conjugator tense key, mood, our tense label, CEFR level] -- all 5 simple
+// indicative tenses the engine exposes (IndicativoSubSimpleKey in its
+// types), not a hand-picked subset. Levels follow the order Spanish
+// courses typically introduce these tenses in (present first, preterite
+// once past tense begins, imperfect/future/conditional as grammar gets
+// more advanced) -- a conjugated card's own level is the max of this and
+// its verb's level (see expandVerb), so e.g. a common A1 verb's
+// *conditional* form is still gated at B1/B2.
 const TENSES = [
-  ['Presente', 'Indicativo', 'present tense'],
-  ['PreteritoIndefinido', 'Indicativo', 'preterite (past)'],
-  ['PreteritoImperfecto', 'Indicativo', 'imperfect (past)'],
-  ['FuturoImperfecto', 'Indicativo', 'future'],
-  ['CondicionalSimple', 'Indicativo', 'conditional'],
+  ['Presente', 'Indicativo', 'present tense', 'A1'],
+  ['PreteritoIndefinido', 'Indicativo', 'preterite (past)', 'A2'],
+  ['PreteritoImperfecto', 'Indicativo', 'imperfect (past)', 'B1'],
+  ['FuturoImperfecto', 'Indicativo', 'future', 'B1'],
+  ['CondicionalSimple', 'Indicativo', 'conditional', 'B2'],
 ];
 
 // Spanish tenses whose yo and él/ella forms are always spelled identically
@@ -112,7 +118,7 @@ export function createConjugationExpander(usedIds) {
     const infinitiveGloss = verbWord.en;
     const created = [];
 
-    for (const [tenseKey, mood, tenseLabel] of TENSES) {
+    for (const [tenseKey, mood, tenseLabel, tenseLevel] of TENSES) {
       const forms = entry.conjugation?.[mood]?.[tenseKey];
       if (!forms || forms.length < 6) continue;
 
@@ -133,6 +139,7 @@ export function createConjugationExpander(usedIds) {
           es,
           category: 'verbs',
           type: 'conjugation',
+          level: maxLevel(verbWord.level, tenseLevel),
           context: `${verbWord.es} (${infinitiveGloss}) · ${person} · ${tenseLabel}`,
         });
       }

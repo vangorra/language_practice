@@ -190,6 +190,41 @@ test('pickNextWord introduces a new word past the cap when nothing due or master
   assert.ok([1, 2].includes(pick.id));
 });
 
+test('pickNextWord prefers the lowest CEFR level among brand-new candidates', () => {
+  const words = [
+    { id: 1, level: 'B1' },
+    { id: 2, level: 'A1' },
+    { id: 3, level: 'A2' },
+  ];
+  const now = 0;
+  const states = { 1: createWordState(now), 2: createWordState(now), 3: createWordState(now) };
+  const pick = pickNextWord(words, states, new Set(), { now, newWordCap: 3, rng: () => 0.99 });
+  assert.equal(pick.id, 2, 'A1 (the lowest level present) should always win over B1/A2');
+});
+
+test('pickNextWord picks randomly among ties at the lowest level, ignoring higher-level candidates entirely', () => {
+  const words = [
+    { id: 1, level: 'A1' },
+    { id: 2, level: 'A1' },
+    { id: 3, level: 'C2' },
+  ];
+  const now = 0;
+  const states = { 1: createWordState(now), 2: createWordState(now), 3: createWordState(now) };
+  const pick = pickNextWord(words, states, new Set(), { now, newWordCap: 3, rng: () => 0.99 });
+  assert.ok([1, 2].includes(pick.id), 'only the two A1 candidates are eligible');
+});
+
+test('pickNextWord introducing a new word past the cap also prefers the lowest level', () => {
+  const words = [
+    { id: 1, level: 'B2' },
+    { id: 2, level: 'A2' },
+  ];
+  const now = 0;
+  const states = { 1: createWordState(now), 2: createWordState(now) };
+  const pick = pickNextWord(words, states, new Set(), { now, newWordCap: 0, rng: () => 0.99 });
+  assert.equal(pick.id, 2, 'the cap-exceeded fallback still prefers the lower level');
+});
+
 test('pickNextWord falls back to the earliest-seen mastered word when the mastery-check roll fails and nothing else qualifies', () => {
   const words = [{ id: 1 }, { id: 2 }];
   const now = 100_000;

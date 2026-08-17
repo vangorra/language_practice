@@ -3,6 +3,7 @@ import { createWordState, reviewWord, tierOf, pickNextWord, markKnown, markNeeds
 import { getAllWordStates, putWordState, clearWordStates, getHistoryAll, putHistoryDay, clearHistory } from './db.js';
 import { dateKey, addReviewToRecord, computeStreak, computeLongestStreak, lastNDaysSeries, totals } from './history.js';
 import { createConjugationExpander } from './dynamic-conjugator.js';
+import { LEVELS } from './level.js';
 
 const MATCH_FLASH_MS = 350; // green highlight, before the fade-out starts
 const REMOVE_FADE_MS = 220; // fade-out duration for a just-matched card
@@ -401,6 +402,32 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     });
   }
 
+  /**
+   * Per-CEFR-level introduction progress, plus the current "frontier"
+   * level -- the lowest level that still has un-introduced (never-seen)
+   * words, matching the same notion pickNextWord uses to prioritize new
+   * words (see srs.js's lowestLevelAmong). Once a level's words are all
+   * introduced at least once, the frontier moves on to the next one.
+   */
+  function getLevelProgress() {
+    const byLevel = {};
+    for (const level of LEVELS) byLevel[level] = { total: 0, introduced: 0 };
+    for (const w of allWords) {
+      const bucket = byLevel[w.level];
+      bucket.total++;
+      if (states[w.id].timesSeen > 0) bucket.introduced++;
+    }
+    /* c8 ignore start -- the `?? LEVELS.at(-1)` fallback only fires once
+       every level, C2 included, is fully introduced -- i.e. the entire
+       multi-thousand-word deck (every static word plus every conjugation
+       of every verb) has been seen at least once. Same order of magnitude
+       as fillPool/swapInReplacements' "deck exhausted" cases above,
+       deliberately left untested for the same reason. */
+    const currentLevel = LEVELS.find((level) => byLevel[level].introduced < byLevel[level].total) ?? LEVELS.at(-1);
+    /* c8 ignore stop */
+    return { currentLevel, byLevel };
+  }
+
   /** Lightweight lookup for the long-press menu — avoids rebuilding the full table array just to check one word. */
   function getWordStatus(wordId) {
     const s = states[wordId];
@@ -465,6 +492,7 @@ export async function createGame({ poolSize = 6, onChange = () => {} } = {}) {
     getHistorySummary,
     getWordStatus,
     getWordById,
+    getLevelProgress,
   };
 }
 
